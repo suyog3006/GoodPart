@@ -550,6 +550,18 @@ python scripts/api_smoke.py                                    # end-to-end: bui
 
 PyTorch on ROCm exposes AMD GPUs through the `cuda` device name, so `DEVICE=cuda` is correct on AMD hardware.
 
+### Saved stations
+
+A station is built once and saved on the GPU machine: its good photos, its trained memory banks, its calibration and its inspection history (`/data/store`: SQLite database, images, one `<station>.pkl` per station). It survives API restarts and reboots, and setup can be resumed at any time from the Stations page; nothing is uploaded twice. Photos upload a few at a time, so any number works through the hosted app.
+
+To keep stations when the droplet is destroyed, copy them to your computer first and put them back on the new droplet:
+
+```bash
+scripts/store_backup.sh                 # your stations -> ~/goodpart_data/store_backup (WITH_SHOWCASE=1 adds the 2 VisA stations, ~5 GB)
+scripts/store_restore.sh root@<new-ip>  # back onto a new droplet
+scripts/restart_api.sh root@<new-ip>    # restart the API so it loads them
+```
+
 ### Frontend
 
 ```bash

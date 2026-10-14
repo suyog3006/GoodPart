@@ -63,8 +63,11 @@ def auth(authorization: str | None = Header(default=None)):
 
 def db() -> sqlite3.Connection:
     STORE.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(DB_PATH, check_same_thread=False)
+    # Autocommit (isolation_level=None): every statement commits on its own, so a request that fails
+    # half-way can never leave a write lock behind. WAL lets readers and a writer work concurrently.
+    con = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=30, isolation_level=None)
     con.row_factory = sqlite3.Row
+    con.execute("PRAGMA journal_mode=WAL")
     con.executescript("""
     CREATE TABLE IF NOT EXISTS station (id TEXT PRIMARY KEY, name TEXT, created REAL, status TEXT,
         mm_per_px REAL, zones TEXT DEFAULT '[]', meta TEXT DEFAULT '{}');
@@ -189,6 +192,9 @@ def list_stations():
         d["counts"] = {x["decision"]: x["n"] for x in c}
         if d["status"] == "ready":
             d["meta"]["drift"] = monitor.status(r["id"]).get("status", "unknown")
+        q = con.execute("SELECT quality FROM image WHERE station=? AND role='good'", (r["id"],)).fetchall()
+        d["n_images"] = len(q)
+        d["n_usable"] = sum(1 for x in q if not json.loads(x["quality"]).get("flags"))
         out.append(d)
     return out
 
@@ -203,6 +209,51 @@ def create_station(body: StationIn):
     return {"id": sid}
 
 
+@app.delete("/stations/{sid}", dependencies=[Depends(auth)])
+def delete_station(sid: str):
+    """Delete a station with its photos, inspections and trained memory banks."""
+    import shutil
+
+    if sid in READONLY:
+        raise HTTPException(403, "This showcase station is read-only.")
+    con = db()
+    station_row(con, sid)
+    for t, k in (("review", "inspection IN (SELECT id FROM inspection WHERE station=?)"),
+                 ("inspection", "station=?"), ("image", "station=?"), ("station", "id=?")):
+        con.execute(f"DELETE FROM {t} WHERE {k}", (sid,))
+    _stations.pop(sid, None)
+    (STATIONS_DIR / f"{sid}.pkl").unlink(missing_ok=True)
+    shutil.rmtree(IMG_DIR / sid, ignore_errors=True)
+    return {"deleted": sid}
+
+
+@app.get("/stations/{sid}/images", dependencies=[Depends(auth)])
+def list_good(sid: str):
+    """Good photos already saved for a station, so setup can resume without re-uploading."""
+    con = db()
+    station_row(con, sid)
+    rows = con.execute("SELECT id, quality FROM image WHERE station=? AND role='good'", (sid,)).fetchall()
+    out = []
+    for r in rows:
+        q = json.loads(r["quality"])
+        out.append({"id": r["id"], "flags": q.get("flags", []), "sharpness": q.get("sharpness"),
+                    "scale": q.get("scale")})
+    return {"images": out, "n_usable": sum(1 for x in out if not x["flags"])}
+
+
+@app.get("/stations/{sid}/images/{iid}", dependencies=[Depends(auth)])
+def good_thumb(sid: str, iid: str):
+    con = db()
+    r = con.execute("SELECT path FROM image WHERE id=? AND station=?", (iid, sid)).fetchone()
+    if not r:
+        raise HTTPException(404)
+    img = cv2.imread(r["path"])
+    h, w = img.shape[:2]
+    s = 160 / max(h, w)
+    ok, buf = cv2.imencode(".jpg", cv2.resize(img, (int(w * s), int(h * s)), interpolation=cv2.INTER_AREA))
+    return StreamingResponse(io.BytesIO(buf.tobytes()), media_type="image/jpeg")
+
+
 @app.post("/stations/{sid}/images", dependencies=[Depends(auth)])
 async def upload_good(sid: str, files: list[UploadFile] = File(...)):
     if sid in READONLY:
@@ -213,7 +264,11 @@ async def upload_good(sid: str, files: list[UploadFile] = File(...)):
     d.mkdir(parents=True, exist_ok=True)
     report = []
     for f in files:
-        rgb = read_image(await f.read())
+        try:
+            rgb = read_image(await f.read())
+        except HTTPException:
+            report.append({"id": None, "file": f.filename, "flags": ["not a readable image"], "sharpness": 0, "scale": False})
+            continue
         q = align.quality(rgb)
         iid = uuid.uuid4().hex[:12]
         p = d / f"{iid}.png"
@@ -223,7 +278,8 @@ async def upload_good(sid: str, files: list[UploadFile] = File(...)):
             scale["mm_per_px"] *= rgb.shape[1] / 768
         q["scale"] = scale
         con.execute("INSERT INTO image VALUES (?,?,?,?,?)", (iid, sid, str(p), "good", json.dumps(q)))
-        report.append({"id": iid, "file": f.filename, **q})
+        report.append({"id": iid, "file": f.filename, **{k: v for k, v in q.items() if k != "scale"},
+                       "scale": bool(q.get("scale"))})
     con.commit()
     scales = [r["scale"]["mm_per_px"] for r in report if r.get("scale")]
     if scales:

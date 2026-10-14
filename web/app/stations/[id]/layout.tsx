@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, readOnly } from "@/lib/api";
 
 const TABS = [
   ["", "Inspect"],
@@ -23,6 +23,11 @@ export default function StationLayout({ children }: { children: React.ReactNode 
         {s.data?.station && <p className="text-ink-dim">{s.data.station.guarantee}</p>}
       </div>
       <nav className="mb-6 flex flex-wrap gap-1 border-b border-rule" aria-label="Station sections">
+        {!readOnly(id) && (
+          <Link href={`/setup?station=${id}`} className="-mb-px order-last border-b-[3px] border-transparent px-4 py-2.5 text-[15px] text-ink-dim hover:text-ink">
+            Good photos
+          </Link>
+        )}
         {TABS.map(([suffix, label]) => {
           const href = `/stations/${id}${suffix}`;
           const active = path === href;

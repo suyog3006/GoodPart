@@ -43,16 +43,32 @@ def pick_reference(images) -> int:
     return int(max(cand, key=lambda i: quality(images[i])["sharpness"]))
 
 
+MARKER_ID = 0  # print ArUco DICT_4X4_50 marker 0; other ids are ignored to avoid false scale readings
+
+
 def detect_scale(rgb: np.ndarray, marker_mm: float = 20.0) -> dict | None:
-    """mm per pixel from a printed ArUco marker (DICT_4X4_50) of known side length."""
-    g = cv2.cvtColor(np.asarray(rgb), cv2.COLOR_RGB2GRAY)
-    det = cv2.aruco.ArucoDetector(cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50))
-    corners, ids, _ = det.detectMarkers(g)
-    if ids is None or not len(corners):
+    """mm per pixel from the printed ArUco marker (DICT_4X4_50, id 0) of known side length.
+
+    Robust to the different array shapes OpenCV versions return; never raises.
+    """
+    try:
+        g = cv2.cvtColor(np.asarray(rgb), cv2.COLOR_RGB2GRAY)
+        det = cv2.aruco.ArucoDetector(cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50))
+        corners, ids, _ = det.detectMarkers(g)
+        if ids is None or len(corners) == 0:
+            return None
+        ids = np.asarray(ids).ravel()
+        for c, i in zip(corners, ids):
+            if int(i) != MARKER_ID:
+                continue
+            c = np.asarray(c, np.float32).reshape(-1, 2)
+            side_px = float(np.mean([np.linalg.norm(c[k] - c[(k + 1) % 4]) for k in range(4)]))
+            if side_px < 12:  # too small to measure reliably
+                return None
+            return {"mm_per_px": marker_mm / side_px, "marker_id": int(i), "corners": c.tolist()}
+    except Exception:
         return None
-    c = corners[0][0]
-    side_px = float(np.mean([np.linalg.norm(c[i] - c[(i + 1) % 4]) for i in range(4)]))
-    return {"mm_per_px": marker_mm / side_px, "marker_id": int(ids[0][0]), "corners": c.tolist()}
+    return None
 
 
 class Registrar:

@@ -15,12 +15,18 @@ function StationRow({ s }: { s: StationSummary }) {
   const cal = m.calibration ?? {};
   const total = (s.counts.pass ?? 0) + (s.counts.review ?? 0) + (s.counts.reject ?? 0);
   return (
-    <Link href={`/stations/${s.id}`}
+    <Link href={s.status === "ready" || api.demo ? `/stations/${s.id}` : `/setup?station=${s.id}`}
           className="grid grid-cols-2 gap-4 border-t border-rule px-1 py-5 hover:bg-housing sm:grid-cols-[2fr_1fr_1fr_1fr_1.4fr] sm:items-center">
       <div className="col-span-2 sm:col-span-1">
         <div className="font-display text-2xl font-semibold leading-tight">{s.name}</div>
         <div className="text-sm text-ink-dim">
-          {s.status === "ready" ? `${m.n_build ?? "?"} good photos in memory, ${cal.n_cal ?? "?"} for calibration` : s.status}
+          {s.status === "ready"
+            ? `${m.n_build ?? "?"} good photos in memory, ${cal.n_cal ?? "?"} for calibration`
+            : s.status === "building"
+              ? "Building on the GPU…"
+              : s.status === "error"
+                ? "Build failed. Open to add photos and try again."
+                : `Continue setup: ${s.n_usable ?? 0} usable photos saved`}
         </div>
       </div>
       <div>

@@ -61,6 +61,8 @@ export type StationSummary = {
   id: string;
   name: string;
   status: string;
+  n_images?: number;
+  n_usable?: number;
   mm_per_px: number | null;
   counts: Partial<Record<Decision, number>>;
   meta: Record<string, unknown>;
@@ -80,6 +82,9 @@ export type StationDetail = StationSummary & {
     timings: Record<string, number>;
   };
 };
+
+export type Upload = { id: string | null; file: string; flags: string[]; sharpness: number; scale: boolean };
+export type SavedPhoto = { id: string; flags: string[]; sharpness: number | null; scale: unknown };
 
 export type Zone = {
   name: string;
@@ -197,11 +202,9 @@ export const api = {
   uploadGood: async (id: string, files: File[]) => {
     const fd = new FormData();
     for (const f of files) fd.append("files", await shrink(f), f.name);
-    return live<{ uploaded: { id: string; file: string; flags: string[]; sharpness: number; scale: unknown }[] }>(
-      `stations/${id}/images`,
-      { method: "POST", body: fd },
-    );
+    return live<{ uploaded: Upload[] }>(`stations/${id}/images`, { method: "POST", body: fd });
   },
+  listGood: (id: string) => live<{ images: SavedPhoto[]; n_usable: number }>(`stations/${id}/images`),
   build: (id: string) => live<{ status: string }>(`stations/${id}/build`, { method: "POST" }),
   saveZones: (id: string, zones: Zone[], mm_per_px?: number | null) =>
     live<{ ok: boolean }>(`stations/${id}/zones`, {
