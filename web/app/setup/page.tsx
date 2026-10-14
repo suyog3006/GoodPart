@@ -100,7 +100,8 @@ export default function Setup() {
       {step === "photos" && (
         <div className="flex flex-col gap-5">
           <p className="max-w-[65ch] text-ink-dim">
-            Add 20 to 50 photos of good parts, taken the same way production photos will be: same camera, lighting and fixture.
+            Add photos of good parts, taken the same way production photos will be: same camera, lighting and fixture.
+            30 photos give a working station; 60 or more give a tighter false-reject guarantee and a certified review band.
             Include a printed scale marker in the frame so defects can be measured in millimetres.
           </p>
           <label onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
@@ -127,7 +128,7 @@ export default function Setup() {
                   className="self-start rounded-sm bg-steel px-5 py-3 font-semibold text-tag-ink disabled:opacity-60">
             Build station from {usable} photos
           </button>
-          {usable < 8 && <p className="text-sm text-ink-dim">At least 8 usable photos are needed; about 30 gives a useful guarantee.</p>}
+          {usable < 8 && <p className="text-sm text-ink-dim">At least 8 usable photos are needed. With 30, false rejects are bounded near 7%; with 60, near 3.6%; with 100, near 2%.</p>}
         </div>
       )}
 

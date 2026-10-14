@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { api } from "@/lib/api";
+import { api, binomCdf } from "@/lib/api";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- rows mirror results CSV columns
 type Row = Record<string, any>;
@@ -103,7 +103,7 @@ export default function Evaluation() {
                   <td className="pr-3">{num(r.auroc_A)} / {num(r.auroc_B)} / <b>{num(r.auroc)}</b></td>
                   <td className="pr-3">{num(r.aupro)}</td>
                   <td className="pr-3">{pct(r.miss_rate, 0)} (≤ {pct(r.miss_upper95, 0)})</td>
-                  <td className={`pr-3 ${r.false_reject_rate > r.alpha_guaranteed ? "text-hold" : ""}`}>
+                  <td className={`pr-3 ${1 - binomCdf(r.false_reject_k - 1, r.n_test_good, r.alpha_guaranteed) < 0.05 ? "text-hold" : ""}`}>
                     {pct(r.false_reject_rate, 0)} (≤ {pct(r.false_reject_upper95, 0)})
                   </td>
                   <td className="pr-3">{pct(r.review_share, 0)}</td>
@@ -114,8 +114,9 @@ export default function Evaluation() {
           </table>
         </div>
         <p className="mt-2 text-sm text-ink-dim">
-          False-reject rates in yellow exceed the 1% guarantee on the test split. The guarantee assumes test parts look like
-          calibration parts; where they do not, the drift guard is meant to pause it.
+          False-reject rates in yellow exceed the 1% guarantee by more than chance explains (binomial test, p &lt; 0.05).
+          The guarantee assumes test parts look like calibration parts; on these categories the VisA test split differs
+          from the training split, which is exactly the shift the drift guard is meant to catch.
         </p>
       </Section>
 

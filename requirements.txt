@@ -1,0 +1,13 @@
+# Inside rocm/pytorch (torch, torchvision and numpy come with the image)
+transformers>=4.57
+opencv-python-headless>=4.10
+scikit-learn>=1.5
+scipy>=1.13
+statsmodels>=0.14
+pandas>=2.2
+pyyaml>=6.0
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+openai>=1.40
+requests>=2.32

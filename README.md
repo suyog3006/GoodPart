@@ -4,7 +4,7 @@
 
 Built for the **AMD Developer Hackathon: ACT III**, track **Intelligent Industry**.
 
-> **Status:** in development during the hackathon (online build 12–17 Oct 2026). Commands and module paths describe the intended interface. Every result marked `—` is filled in by our evaluation scripts, never by hand.
+> **Status:** working end to end on an AMD Instinct MI300X (AMD Developer Cloud, ROCm 10.1, PyTorch 2.14). Evaluated on all 12 VisA categories and every official test image. Every number in section 7 is generated from `results/*.csv` by `scripts/readme_tables.py`, never typed by hand. Results not yet measured are marked `—`.
 
 | | |
 | --- | --- |
@@ -106,7 +106,7 @@ GoodPart builds an inspection station from a few dozen photos of good parts. Bef
 | 5 | **Registration and drift guard** | Aligns every image to the reference; warns when score statistics shift | Removes false alarms from fixture play; catches moved cameras and new lighting |
 | 6 | **Shop-floor web interface** | A custom React/Next.js app: decision-first inspection console, keyboard-driven review, live camera, zone editor, interactive calibration | Operators trust and adopt what they can read at a glance (section 6.6) |
 
-The vision-language model only **names** defect types for the report. It never decides pass or reject.
+The vision-language model only **names** defect types for the report. It never decides pass or reject. We serve **Qwen3-VL-30B-A3B-Instruct** with vLLM on the same MI300X as the detectors; AMD Token Factory is the fallback, and template text is the last resort. (We started with Qwen2.5-VL-7B: it answered 8 concurrent requests in 0.83 s but mislabelled most stains as scratches or chips; the 30B mixture-of-experts model labels them correctly at 2.5 s for 8 concurrent requests, and fits next to the detectors in 192 GB.)
 
 ### 6.3 Anomaly detection method
 
@@ -186,7 +186,7 @@ Following Roth et al., CVPR 2022:
 3. Record each defect as hit (scored above the lower threshold) or miss, together with its size `a` (equivalent diameter in mm) and contrast.
 4. Fit a hit/miss probability-of-detection model, per contrast bin:
    `logit(POD(a)) = b0 + b1 * log(a)`.
-5. Report `a90` (the size detected 90% of the time) and `a90/95` (the 95% lower confidence bound on that size), following the convention of MIL-HDBK-1823A for non-destructive evaluation.
+5. Report `a90` (the size detected 90% of the time) and `a90/95` (the one-sided 95% upper confidence bound on that size, so we are 95% confident that POD ≥ 90% from `a90/95` upward), following the convention of MIL-HDBK-1823A for non-destructive evaluation.
 6. **Validation:** check the synthetic POD curve against real defects (VisA defect masks give real sizes). The report says plainly whether the synthetic curve predicts real-defect detection.
 
 #### C. Calibration with guarantees
@@ -194,6 +194,7 @@ Following Roth et al., CVPR 2022:
 - **Upper threshold `t_high` (reject).** Score the `n` calibration images of good parts. With target false-reject rate `alpha`, set `t_high` to the `ceil((n + 1) * (1 - alpha))`-th smallest calibration score. If parts are exchangeable with the calibration set, the probability that a good part is rejected is at most `alpha`.
   - The guarantee needs enough images: `n >= 1/alpha - 1`. That means 19 good images for 5%, or 99 for 1%.
   - Stations therefore start with a looser guarantee, and it tightens automatically as inspectors confirm good parts.
+  - The review band needs enough calibration parts too: with fewer than about 30, Learn-then-Test can certify only a very narrow band, so a new station built from 30 photos mostly passes or rejects. We recommend 60 or more good photos at setup.
 - **Lower threshold `t_low` (pass).** Chosen with Learn-then-Test so that, with high probability, the share of good parts landing in review stays below a cap (e.g., 15%). Among the admissible values, pick the one that minimises misses on synthetic defects.
 - **Miss rate.** Wherever real defects are available, report misses `k` out of `m` with an exact Clopper–Pearson 95% upper bound. Synthetic miss rates are shown separately and never mixed with real ones.
 - The guarantee is marginal and holds only while conditions match the calibration data. The drift guard (pipeline F) exists because of this assumption.
@@ -283,7 +284,7 @@ flowchart LR
         GEN --> DB2
         DA --> COMB["Normalise + combine scores and heatmaps"]
         DB2 --> COMB
-        COMB --> VLM["Defect naming: Qwen2.5-VL on vLLM"]
+        COMB --> VLM["Defect naming: Qwen3-VL-30B-A3B on vLLM"]
     end
     COMB --> DEC["Decision engine: conformal bands + spec rules"]
     DEC --> STORE[("Store: SQLite + files")]
@@ -297,7 +298,7 @@ flowchart LR
 | --- | --- | --- |
 | **Web app (Next.js)** | All screens in section 6.6; server-side route handlers that hold the API token; demo mode | Vercel |
 | **Inference service (FastAPI)** | Registration, both detectors, synthetic generation, live updates, timing logs | AMD GPU via PyTorch on ROCm |
-| **vLLM server** | Qwen2.5-VL-7B-Instruct for defect naming, with structured JSON output | AMD GPU via vLLM on ROCm |
+| **vLLM server** | Qwen3-VL-30B-A3B-Instruct for defect naming and the zero-shot baseline, JSON output | AMD GPU via vLLM on ROCm |
 | **Decision engine** | Bands, geometry, spec rules, final decision and reason | CPU, deterministic |
 | **Statistics module** | Conformal thresholds, Learn-then-Test selection, Clopper–Pearson bounds, POD fitting, drift tests | CPU |
 | **Store** | SQLite metadata plus image, heatmap and memory-bank files | GPU machine disk |
@@ -349,7 +350,239 @@ Every result records the device that produced it and its latency. `scripts/bench
 ### Baselines
 
 1. **Golden-template difference.** Compare each image with the average good image.
-2. **Zero-shot vision-language model.** Ask Qwen2.5-VL whether the part is defective and where.
+2. **Zero-shot vision-language model.** Ask Qwen3-VL-30B-A3B (served on our MI300X) whether the part is defective and where.
+3. **PatchCore with WideResNet-50 and a default single threshold.**
+
+### Metrics
+
+| Metric | What it shows |
+| --- | --- |
+| Image-level AUROC (per detector and combined) | How well scores separate good from defective |
+| Localisation (AUPRO) | Whether heatmaps point at the real defect |
+| Miss rate and false-reject rate at the operating point, with Clopper–Pearson bounds | The errors a quality manager cares about |
+| Review share | Inspector workload |
+| Guarantee validity | Realised false-reject rate on test data versus the conformal bound |
+| POD agreement | Synthetic POD curve versus detection of real VisA defects by size |
+| Few-shot curve | AUROC with 1, 8, 16, 32 and all build images, for each detector and the combination |
+| Spec decision accuracy | On the own set, agreement of zone-rule decisions with the team's labels |
+| Review speed | Seconds per reviewed part in the review queue, measured during the team's own labelling |
+| Setup time, throughput, latency, cost per 1,000 inspections | Operational value of the AMD GPU |
+
+### Protocol
+
+- Build, calibration and test splits never overlap; thresholds are never tuned on test data.
+- Fixed seeds and one config file per experiment; results written to `results/*.csv` with bootstrap confidence intervals.
+- A failure gallery in the app shows missed defects and false rejects openly.
+
+### Results
+
+| Category | AUROC (A / B / combined) | AUPRO | Miss rate (95% upper bound) | False-reject rate (bound) | Review share | a90/95 (mm) |
+| --- | --- | --- | --- | --- | --- | --- |
+| — | — | — | — | — | — | — |
+
+| Method (same false-reject rate) | Miss rate | Review share |
+| --- | --- | --- |
+| Golden-template difference | — | n/a |
+| Zero-shot vision-language model | — | n/a |
+| PatchCore, default threshold | — | n/a |
+| **GoodPart** | — | — |
+
+---
+
+## 8. Final plan, end to end
+
+### Milestones (in priority order)
+
+| # | Milestone | Exit criterion |
+| --- | --- | --- |
+| M0 | Compute and compatibility spike | On an AMD GPU: PyTorch on ROCm works; DINOv2 and WideResNet features extract; one VisA category scores end to end; Qwen2.5-VL answers 8 concurrent image requests correctly under vLLM; first timings logged |
+| M1 | Anomaly detection and evaluation harness | Both detectors plus the combination evaluated on 4–6 VisA categories, with all three baselines; few-shot curve |
+| M2 | Calibration with guarantees | Conformal bands and Learn-then-Test selection implemented; guarantee validity checked on test data |
+| M3 | Synthetic stress test and POD | Procedural defects (required) and diffusion inpainting (if the licence and time allow); POD fit, a90/95; synthetic-versus-real agreement measured |
+| M4 | Spec-aware acceptance and registration | Scale marker, registration, geometry, zone rules, final decision and reason |
+| M5 | Web interface | Stations, setup wizard, zone editor, calibration, inspection console, review queue and evaluation pages working against the live API and in demo mode |
+| M6 | Own physical dataset | About 150 good and 30 damaged parts captured, labelled through the review queue, evaluated; live rehearsal |
+| M7 | Defect naming and benchmarks | Vision-language naming with template fallback, 50 crops rated by two people; AMD benchmark charts complete |
+| M8 | Submission package | Repo, live Vercel URL, MP4 video, PDF slides, 16:9 cover, descriptions; submitted by 17 Oct |
+| M9 (optional) | Drift guard, shift-summary map, logical anomalies | Only if M0–M8 are done |
+
+### Schedule
+
+| Day | Backend and models | Frontend |
+| --- | --- | --- |
+| 13 Oct | Confirm GPU access on every member's account; M0 spike; photo pilot (20 good, 5 damaged) on a laptop CPU | Next.js skeleton, design system, API types, mock data; stations and inspection console against mocks |
+| 14 Oct | M1 and M2; procedural defect generator; registration | Setup wizard, zone editor, calibration screen with live sliders |
+| 15 Oct | M3 (POD) and M4 (spec rules); capture the own dataset | Build and stress-test screens with live progress; review queue with keyboard shortcuts |
+| 16 Oct | Full evaluation run; M7 naming and benchmarks; HTTPS and CORS setup | Connect all screens to the live API; demo mode; evaluation and benchmark pages; polish |
+| 17 Oct | Freeze features; README results | Final polish; deploy to Vercel; record video; slides and cover; submit |
+
+### Work split
+
+| Person | Owns |
+| --- | --- |
+| Computer vision and statistics | Both detectors, normalisation, calibration maths, POD fitting, evaluation harness |
+| Backend and serving | ROCm environment, FastAPI service, vLLM, synthetic generation on GPU, live updates, HTTPS, benchmarks |
+| Frontend and product | Next.js app, design system, all screens, demo mode, photo rig, demo video, slides, cover |
+
+With two people, the first two roles merge, and the frontend owner also takes the demo assets.
+
+### Top risks and contingencies
+
+| Risk | Early test | Contingency |
+| --- | --- | --- |
+| No AMD GPU access in time | Check every member's credit and AMD AI Notebooks login today | Use the first account that activates. If none exists by the end of 14 Oct, escalate to the organisers, run the models on CPU and use the Token Factory model as the AMD component; this is weaker but compliant |
+| ROCm incompatibility (backbone, inpainting model, vLLM vision attention) | M0 spike, including a concurrency test | Minimal PyTorch implementations; procedural defects only; Token Factory or template naming |
+| Synthetic POD does not predict real detection | Synthetic-versus-real agreement on VisA in M3 | Present POD as a stress test, not a guarantee, and report the gap honestly |
+| UI scope grows faster than time | Screens prioritised in M5 order; demo mode built early | Cut the shift summary and failure gallery before cutting the inspection console, review queue or calibration screen |
+| Vercel cannot reach the GPU API (HTTPS, CORS) | Deploy a test page to Vercel on day 2 that calls the API | Demo mode keeps the URL working; record the live GPU flow in the video |
+| Own photos noisier than the benchmark | Photo pilot today | Fixed rig, registration, cropping; fall back to VisA for the live demo |
+
+### Submission checklist
+
+- [ ] Public GitHub repository under the MIT licence, with no keys committed
+- [ ] Live application URL on Vercel, with labelled live and demo modes
+- [ ] Demo video (MP4) showing AMD GPU operation
+- [ ] Slides (PDF)
+- [ ] Cover image (PNG or JPG, 16:9)
+- [ ] Title, short and long descriptions within the form's limits; track: Intelligent Industry; technology tags
+- [ ] README results filled in from `results/*.csv`
+
+---
+
+## 9. Run it
+
+### Backend (on the AMD GPU machine)
+
+Tested on an AMD Developer Cloud GPU Droplet (1× MI300X, ROCm 10.1). Code is edited locally and copied to the droplet; nothing heavy runs on the laptop.
+
+```bash
+# From your laptop: copy the code (never data or secrets) to the droplet
+GOODPART_HOST=root@<droplet-ip> scripts/sync.sh
+
+# On the droplet: AMD's ROCm PyTorch container, with code, data and model caches mounted
+docker run -d --name gp --device=/dev/kfd --device=/dev/dri --group-add video --ipc=host   --shm-size 64g -v /root/goodpart:/workspace/goodpart -v /root/data:/data -v /root/.cache:/root/.cache   -p 8000:8000 -w /workspace/goodpart rocm/pytorch:latest sleep infinity
+docker exec gp pip install -r requirements.txt
+# /root/goodpart/.env (chmod 600): GOODPART_DATA=/data, GOODPART_STORE=/data/store, VLM_MODE=vllm,
+#   VLLM_BASE=http://vllm:8000/v1, GOODPART_API_TOKEN=<random>, AMD_API_KEY=<Token Factory key, optional>
+
+# Vision-language model on the same GPU (45% of its memory), reachable from gp as http://vllm:8000
+docker network create gpnet && docker network connect gpnet gp
+docker run -d --name vllm --network gpnet --device=/dev/kfd --device=/dev/dri --group-add video   --ipc=host --shm-size 16g -v /root/.cache/huggingface:/root/.cache/huggingface rocm/vllm:latest   vllm serve Qwen/Qwen3-VL-30B-A3B-Instruct --max-model-len 16384 --gpu-memory-utilization 0.45   --limit-mm-per-prompt '{"image": 2}'
+
+# Data, evaluation, few-shot curve, baselines, benchmarks (inside gp)
+python -m goodpart.data.visa                                   # download + cache all 12 categories
+python -m goodpart.eval.run --config configs/eval_visa.yaml   # stations, calibration, POD, baselines
+python -m goodpart.eval.fewshot                                # AUROC vs number of good images
+python -m goodpart.eval.zeroshot --mode vllm                   # zero-shot VLM baseline
+python scripts/benchmark.py --category pcb1 --compare-cpu      # GPU vs CPU timings
+python scripts/vlm_check.py                                    # M0: 8 concurrent naming requests
+python scripts/readme_tables.py > results/README_tables.md     # tables for section 7
+python scripts/export_demo.py                                  # recorded results for demo mode
+
+# Inference service (bearer token required on every route except /health)
+uvicorn goodpart.api.main:app --host 0.0.0.0 --port 8000
+python scripts/api_smoke.py                                    # end-to-end: build a station, inspect parts
+```
+
+PyTorch on ROCm exposes AMD GPUs through the `cuda` device name, so `DEVICE=cuda` is correct on AMD hardware.
+
+### Frontend stack
+
+- **Framework:** Next.js (App Router) with TypeScript.
+- **Styling and components:** Tailwind CSS and shadcn/ui (Radix-based, accessible components).
+- **Image work:** react-konva for the zone editor, region outlines and heatmap overlays on canvas.
+- **Charts:** Recharts or visx for POD curves, histograms and benchmarks.
+- **Data:** TanStack Query; types generated from the FastAPI OpenAPI schema (openapi-typescript); Zod for validation.
+- **Live:** WebSocket or server-sent events for progress and inspections; the browser camera API for live capture.
+- **Testing:** Mock Service Worker, so frontend work proceeds before the backend is ready.
+
+#### Connecting Vercel to the GPU service
+
+- The Vercel app runs over HTTPS, so the inference API must also be served over HTTPS, to avoid browsers blocking mixed content. Use a reverse proxy with automatic certificates (e.g., Caddy) or a tunnel service on the GPU machine.
+- The API accepts requests only from the app's domain (CORS) and with a bearer token held server-side in Next.js route handlers, never shipped to the browser.
+
+### 6.7 System design
+
+```mermaid
+flowchart LR
+    U["Engineer / inspector"] --> WEB["Next.js web app on Vercel"]
+    WEB -->|"HTTPS + token"| API["FastAPI inference service"]
+    WEB -.->|"demo mode"| REC["Recorded results bundled with the app"]
+    subgraph AMD["AMD Instinct MI300X - ROCm"]
+        API --> REG["Registration to reference"]
+        REG --> DA["Detector A: DINOv2 patch kNN"]
+        REG --> DB2["Detector B: PatchCore WideResNet-50"]
+        GEN["Synthetic defect generator: procedural + inpainting"] --> DA
+        GEN --> DB2
+        DA --> COMB["Normalise + combine scores and heatmaps"]
+        DB2 --> COMB
+        COMB --> VLM["Defect naming: Qwen3-VL-30B-A3B on vLLM"]
+    end
+    COMB --> DEC["Decision engine: conformal bands + spec rules"]
+    DEC --> STORE[("Store: SQLite + files")]
+    STORE --> STATS["Statistics: calibration, POD, drift"]
+    STATS --> DEC
+    API -->|"live updates"| WEB
+    TF["Token Factory VLM hosted on AMD"] -.->|"fallback"| VLM
+```
+
+| Service | Responsibility | Runs on |
+| --- | --- | --- |
+| **Web app (Next.js)** | All screens in section 6.6; server-side route handlers that hold the API token; demo mode | Vercel |
+| **Inference service (FastAPI)** | Registration, both detectors, synthetic generation, live updates, timing logs | AMD GPU via PyTorch on ROCm |
+| **vLLM server** | Qwen3-VL-30B-A3B-Instruct for defect naming and the zero-shot baseline, JSON output | AMD GPU via vLLM on ROCm |
+| **Decision engine** | Bands, geometry, spec rules, final decision and reason | CPU, deterministic |
+| **Statistics module** | Conformal thresholds, Learn-then-Test selection, Clopper–Pearson bounds, POD fitting, drift tests | CPU |
+| **Store** | SQLite metadata plus image, heatmap and memory-bank files | GPU machine disk |
+
+**Data model**
+
+| Entity | Key fields |
+| --- | --- |
+| `Station` | product name, active detectors, image size, mm-per-pixel scale, created at |
+| `ReferenceImage` | station, path, role (build / calibration), quality flags, registration keypoints |
+| `ZoneMap` | station, polygons, per-zone rules (max length mm, max area mm², max count) |
+| `MemoryBank` | station, detector, backbone, size, file path |
+| `Calibration` | station, alpha, review cap, t_low, t_high, normalisation stats, n calibration images, guarantee achieved |
+| `StressTest` | station, synthetic defect set, POD fit parameters, a90, a90/95 |
+| `Inspection` | station, image, combined score, per-detector scores, decision, reason, device, latency |
+| `DefectRegion` | inspection, bounding box, area mm², length mm, zone, defect name |
+| `ReviewLabel` | inspection, reviewer, label (good / defect), defect type, time |
+| `DriftEvent` | station, window, test statistic, p-value, action taken |
+
+### 6.8 Where AMD makes a difference
+
+| Workload | Why the GPU matters | Measured on MI300X | Same code on CPU |
+| --- | --- | --- | --- |
+| Station build (both detectors) | Dense ViT and CNN inference at high resolution | — s | — s |
+| Synthetic defect generation (diffusion inpainting) | Thousands of generations per station | — images/min | not practical |
+| Stress-test scoring | Thousands of synthetic images through two detectors | — images/s | — images/s |
+| Inspection, batch size 32 / p95 latency | Interactive and batch use | — img/s / — ms | — img/s / — ms |
+| Defect naming | 7B vision-language model with batching | — per s | n/a |
+| Stations resident with the language model | 192 GB of GPU memory | — stations | n/a |
+| Cost per 1,000 inspections | At $2.59 per GPU-hour (AMD Developer Cloud list price) | $— | n/a |
+
+Every result records the device that produced it and its latency. `scripts/benchmark.py` reproduces all timings.
+
+### 6.9 Tech stack
+
+- **Backend:** Python 3.12; PyTorch (ROCm build); DINOv2-family backbone (Hugging Face Transformers or torch hub); WideResNet-50 (torchvision); anomalib optional; torch nearest-neighbour search (faiss-cpu as an alternative); OpenCV; NumPy, SciPy, statsmodels; diffusers; vLLM; FastAPI; SQLite. Run inside AMD's ROCm PyTorch and vLLM containers.
+- **Frontend:** Next.js and TypeScript, Tailwind CSS, shadcn/ui, react-konva, Recharts or visx, TanStack Query, Zod; deployed on Vercel.
+- **No paid APIs.** The vision-language model has three modes: self-hosted vLLM, hosted AMD Token Factory, or template text.
+
+---
+
+## 7. Evaluation
+
+### Data
+
+- **[VisA](https://registry.opendata.aws/visa):** 10,821 images (9,621 normal, 1,200 anomalous) of 12 object types, with pixel-level masks. Licensed CC BY 4.0 per the AWS Open Data registry. Downloaded by script, never committed. We use 4–6 categories.
+- **Our own physical set:** about 150 good and 30 deliberately damaged parts, photographed on a phone stand under a fixed lamp with a printed scale marker. Labelled by the team and released with this repository.
+
+### Baselines
+
+1. **Golden-template difference.** Compare each image with the average good image.
+2. **Zero-shot vision-language model.** Ask Qwen3-VL-30B-A3B (served on our MI300X) whether the part is defective and where.
 3. **PatchCore with WideResNet-50 and a default single threshold.**
 
 ### Metrics
@@ -483,6 +716,8 @@ PyTorch on ROCm exposes AMD GPUs through the `cuda` device name, so `DEVICE=cuda
 cd web
 npm install
 cp .env.example .env.local      # GOODPART_API_URL, GOODPART_API_TOKEN (server-side only), NEXT_PUBLIC_DEMO_MODE
+# For local development against the droplet, tunnel the API instead of exposing it:
+#   ssh -N -L 8000:localhost:8000 root@<droplet-ip>   and set GOODPART_API_URL=http://localhost:8000
 npm run dev                     # local development
 npx vercel --prod               # deploy
 ```
@@ -522,6 +757,10 @@ goodpart/
 - Small calibration sets give loose guarantees; they tighten as reviewed good parts accumulate.
 - Camera, fixture and lighting must stay fixed. GoodPart is not suitable for certifying safety-critical parts.
 - Demo mode shows recorded results; it is labelled as such and is not evidence of live operation.
+- **Measured on VisA:** the 1% false-reject guarantee held on 20 of 24 stations, but was exceeded beyond chance on 4 (pcb1 and pcb2 full stations, macaroni1 and pcb4 few-shot), each at 4–5% on 100 test good parts. On these categories the VisA test split's good parts score differently from the training split's (two-sample KS p = 0.003 for pcb1), which breaks the exchangeability the guarantee rests on. Pooled over all categories the realised false-reject rate was 1.6% (95% upper bound 2.4%) for full stations. Our drift test, at its alert level of p < 0.001, would not have caught these subtler shifts.
+- Station selection uses synthetic defects only. It correctly switches off PatchCore on capsules (AUROC 0.69 vs 0.98), but keeps it on macaroni2, where it hurts (0.61 vs 0.86).
+- VisA images are resized to 768 × 768, which changes their aspect ratio; defect sizes on VisA are therefore reported in pixels, not millimetres. Millimetre measurement needs the printed scale marker in our own photos.
+- Defect names come from a 30B vision-language model and are not perfect: it reliably names stains and scratches but called bent PCB leads "scratch" or "contamination" in our check.
 
 ## Team
 

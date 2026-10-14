@@ -26,7 +26,7 @@ RESULTS_DIR = Path(os.environ.get("GOODPART_RESULTS", ROOT / "results"))
 # Vision-language naming: self-hosted vLLM on the MI300X, or AMD Token Factory, or template text.
 VLM_MODE = os.environ.get("VLM_MODE", "tokenfactory")  # vllm | tokenfactory | template
 VLLM_BASE = os.environ.get("VLLM_BASE", "http://localhost:8001/v1")
-VLLM_MODEL = os.environ.get("VLLM_MODEL", "Qwen/Qwen2.5-VL-7B-Instruct")
+VLLM_MODEL = os.environ.get("VLLM_MODEL", "Qwen/Qwen3-VL-30B-A3B-Instruct")
 AMD_API_BASE = os.environ.get("AMD_API_BASE", "https://developer.amd.com.cn/radeon/api/v1")
 AMD_API_KEY = os.environ.get("AMD_API_KEY", "")
 TF_MODEL = os.environ.get("TF_MODEL", "Qwen3.8-27B")
