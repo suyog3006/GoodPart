@@ -8,7 +8,8 @@ Built for the **AMD Developer Hackathon: ACT III**, track **Intelligent Industry
 
 | | |
 | --- | --- |
-| Live app | `<application URL on Vercel>` |
+| Live app | [goodpart.vercel.app](https://goodpart.vercel.app) (demo mode: recorded results from the AMD MI300X) |
+| Code | [github.com/suyog3006/GoodPart](https://github.com/suyog3006/GoodPart) |
 | Demo video | `<link to MP4>` |
 | Slides | `<link to PDF>` |
 | lablab.ai submission | `<submission link>` |
