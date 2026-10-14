@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+api_key.txt
+data/
+results/**/*.npy
+results/**/*.pt
+.venv/
+node_modules/
+.next/
+__pycache__/
+*.pyc
