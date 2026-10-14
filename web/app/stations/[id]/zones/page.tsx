@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { api, type Zone } from "@/lib/api";
+import { api, readOnly, type Zone } from "@/lib/api";
 
 const SIZE = 768;
 const ZONE_FILLS = ["var(--series-good)", "var(--series-defect)", "var(--steel)"];
@@ -104,13 +104,13 @@ export default function Zones() {
             </div>
           </fieldset>
         ))}
-        {!api.demo ? (
+        {!readOnly(id) ? (
           <button onClick={() => save.mutate()} disabled={save.isPending}
                   className="rounded-sm bg-steel px-4 py-3 text-lg font-semibold text-tag-ink disabled:opacity-60">
             {save.isPending ? "Saving…" : "Save zones"}
           </button>
         ) : (
-          <p className="hatch p-2 text-sm text-hold">Demo mode: zones are not saved.</p>
+          <p className="hatch p-2 text-sm text-hold">{api.demo ? "Demo mode: nothing is saved." : "Showcase station: zones are not saved."}</p>
         )}
         {save.isSuccess && <p className="text-pass">Zones saved. New inspections use them.</p>}
         {save.isError && <p className="text-stop">Could not save zones: {(save.error as Error).message}</p>}

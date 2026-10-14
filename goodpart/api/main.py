@@ -32,6 +32,9 @@ from goodpart.register import align
 from goodpart.station import Station
 
 STORE = config.STORE_DIR
+# Shared showcase stations: anyone may inspect parts on them, but nobody can change their thresholds,
+# zones or review labels through the API.
+READONLY = {x.strip() for x in __import__("os").environ.get("GOODPART_READONLY_STATIONS", "").split(",") if x.strip()}
 STATIONS_DIR = STORE / "stations"
 IMG_DIR = STORE / "images"
 DB_PATH = STORE / "goodpart.db"
@@ -195,6 +198,8 @@ def create_station(body: StationIn):
 
 @app.post("/stations/{sid}/images", dependencies=[Depends(auth)])
 async def upload_good(sid: str, files: list[UploadFile] = File(...)):
+    if sid in READONLY:
+        raise HTTPException(403, "This showcase station is read-only. Set up your own station to change it.")
     con = db()
     station_row(con, sid)
     d = IMG_DIR / sid / "good"
@@ -265,6 +270,8 @@ def _build_job(sid: str, cfg: dict):
 
 @app.post("/stations/{sid}/build", dependencies=[Depends(auth)])
 def build(sid: str, alpha: float = 0.01, review_cap: float = 0.15):
+    if sid in READONLY:
+        raise HTTPException(403, "This showcase station is read-only. Set up your own station to change it.")
     con = db()
     station_row(con, sid)
     con.execute("UPDATE station SET status='building' WHERE id=?", (sid,))
@@ -320,6 +327,8 @@ class CalibIn(BaseModel):
 @app.post("/stations/{sid}/calibrate", dependencies=[Depends(auth)])
 def recalibrate(sid: str, body: CalibIn):
     """Live recalibration from stored calibration + synthetic scores (no GPU work)."""
+    if sid in READONLY:
+        raise HTTPException(403, "This showcase station is read-only. Set up your own station to change it.")
     s = get_station(sid)
     cal = st.calibrate(s.cal_scores, body.alpha, body.review_cap, body.delta, s.synth_scores)
     s.calibration = cal
@@ -337,6 +346,8 @@ class ZonesIn(BaseModel):
 
 @app.put("/stations/{sid}/zones", dependencies=[Depends(auth)])
 def set_zones(sid: str, body: ZonesIn):
+    if sid in READONLY:
+        raise HTTPException(403, "This showcase station is read-only. Set up your own station to change it.")
     con = db()
     station_row(con, sid)
     con.execute("UPDATE station SET zones=? WHERE id=?", (json.dumps(body.zones), sid))
@@ -441,6 +452,8 @@ def review(iid: str, body: ReviewIn):
     r = con.execute("SELECT * FROM inspection WHERE id=?", (iid,)).fetchone()
     if not r:
         raise HTTPException(404)
+    if r["station"] in READONLY:
+        raise HTTPException(403, "Review labels on this showcase station are not saved.")
     con.execute("INSERT OR REPLACE INTO review VALUES (?,?,?,?)", (iid, body.label, body.defect_type, time.time()))
     con.commit()
     out = {"ok": True}

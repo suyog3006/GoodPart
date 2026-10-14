@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, readOnly } from "@/lib/api";
 import { InspectionViewer } from "@/components/InspectionViewer";
 
 const TYPES = ["scratch", "crack", "chip", "stain", "contamination", "missing feature", "deformation", "other"];
@@ -28,6 +28,7 @@ export default function Review() {
       setHistory((h) => [...h, cur.id]);
       setPos((p) => Math.min(p + 1, queue.length - 1));
       try {
+        if (readOnly(id)) return;
         const r = await api.review(cur.id, l.label, l.type);
         if ("guarantee" in r && r.guarantee) setNote(`Calibration grew. ${r.guarantee}`);
         qc.invalidateQueries({ queryKey: ["station", id] });
@@ -113,7 +114,7 @@ export default function Review() {
         </div>
         <p className="text-sm text-ink-dim">Arrow keys move between parts. Parts you confirm as good join the calibration set and tighten the guarantee.</p>
         {note && <p className="text-steel">{note}</p>}
-        {api.demo && <p className="hatch p-2 text-sm text-hold">Demo mode: labels are not saved.</p>}
+        {readOnly(id) && <p className="hatch p-2 text-sm text-hold">Labels on this showcase station are not saved.</p>}
       </aside>
     </div>
   );

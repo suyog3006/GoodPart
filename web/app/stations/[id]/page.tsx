@@ -8,7 +8,13 @@ import { InspectionViewer } from "@/components/InspectionViewer";
 import { ComputeBadge } from "@/components/ComputeBadge";
 import { Camera } from "@/components/Camera";
 
+type Sample = { src: string; truth: "good" | "defective"; source: string };
+
 const FILTERS: (Decision | "all")[] = ["all", "reject", "review", "pass"];
+
+function q_name(id: string) {
+  return id.startsWith("visa-") ? `what a good ${id.slice(5).replace(/\d+$/, "")} looks like` : "one product";
+}
 
 export default function Inspect() {
   const { id } = useParams<{ id: string }>();
@@ -19,13 +25,39 @@ export default function Inspect() {
   const [camera, setCamera] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [sampleTruth, setSampleTruth] = useState<string | null>(null);
+  const [drag, setDrag] = useState(false);
+  const samples = useQuery({
+    queryKey: ["samples"],
+    queryFn: async () => ((await (await fetch("/samples/samples.json")).json()) as Record<string, Sample[]>),
+  });
   const inspect = useMutation({
     mutationFn: (f: File) => api.inspect(id, f),
     onSuccess: (r) => {
       setCurrent(r);
       qc.invalidateQueries({ queryKey: ["inspections", id] });
+      // Defect names arrive a few seconds after the decision; poll for them.
+      if (r.regions.length) {
+        [2500, 6000, 12000].forEach((ms) =>
+          setTimeout(async () => {
+            const rows = await api.inspections(id);
+            const hit = rows.find((x) => x.id === r.id);
+            if (hit) setCurrent((c) => (c && c.id === r.id ? { ...c, regions: hit.regions } : c));
+          }, ms),
+        );
+      }
     },
   });
+
+  function send(f: File, truth: string | null = null) {
+    setSampleTruth(truth);
+    inspect.mutate(f);
+  }
+
+  async function sendSample(sm: Sample) {
+    const blob = await (await fetch(sm.src)).blob();
+    send(new File([blob], "sample.jpg", { type: "image/jpeg" }), sm.truth);
+  }
 
   // Live updates: defect names arrive a moment after the decision.
   useEffect(() => {
@@ -58,20 +90,48 @@ export default function Inspect() {
       </section>
 
       <section aria-label="Decision" className="flex flex-col gap-5">
-        {!api.demo && (
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => fileRef.current?.click()} disabled={inspect.isPending}
-                    className="rounded-sm bg-steel px-4 py-3 text-lg font-semibold text-tag-ink disabled:opacity-60">
-              {inspect.isPending ? "Inspecting…" : "Inspect a photo"}
+        {api.demo ? (
+          <p className="hatch border border-hold/50 p-3 text-[15px] text-hold">
+            The GPU service is switched off right now, so you are seeing recorded results from the AMD MI300X.
+            Uploading your own photos works while it is running.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <label
+              onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+              onDragLeave={() => setDrag(false)}
+              onDrop={(e) => { e.preventDefault(); setDrag(false); const f = e.dataTransfer.files[0]; if (f) send(f); }}
+              className={`flex cursor-pointer flex-col items-center justify-center border-2 border-dashed px-4 py-6 text-center ${drag ? "border-steel bg-housing" : "border-rule hover:border-steel"}`}>
+              <span className="font-display text-2xl font-semibold">
+                {inspect.isPending ? "Inspecting on the AMD GPU…" : "Drop a photo of a part, or choose one"}
+              </span>
+              <span className="mt-1 text-sm text-ink-dim">
+                This station knows {q_name(id)}. Photos of other objects will be rejected as unusual.
+                Uploaded photos are stored on the inspection server and appear in this station&apos;s recent parts.
+              </span>
+              <input ref={fileRef} type="file" accept="image/*" hidden disabled={inspect.isPending}
+                     onChange={(e) => { const f = e.target.files?.[0]; if (f) send(f); e.target.value = ""; }} />
+            </label>
+            {samples.data?.[id] && (
+              <div>
+                <p className="mb-1.5 text-sm text-ink-dim">No part at hand? Inspect one of these photos the station has never seen:</p>
+                <div className="flex gap-2">
+                  {samples.data[id].map((sm) => (
+                    <button key={sm.src} onClick={() => sendSample(sm)} disabled={inspect.isPending}
+                            className="h-16 w-16 overflow-hidden rounded-sm border border-rule hover:border-steel disabled:opacity-50">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={sm.src} alt="Sample part photo" className="h-full w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <button onClick={() => setCamera((c) => !c)} className="self-start rounded-sm border border-rule px-3 py-2 text-[15px]">
+              {camera ? "Close camera" : "Use the camera instead"}
             </button>
-            <button onClick={() => setCamera((c) => !c)} className="rounded-sm border border-rule px-4 py-3 text-lg">
-              {camera ? "Close camera" : "Use camera"}
-            </button>
-            <input ref={fileRef} type="file" accept="image/*" hidden
-                   onChange={(e) => e.target.files?.[0] && inspect.mutate(e.target.files[0])} />
           </div>
         )}
-        {camera && <Camera onCapture={(f) => inspect.mutate(f)} busy={inspect.isPending} />}
+        {camera && <Camera onCapture={(f) => send(f)} busy={inspect.isPending} />}
         {inspect.isError && <p className="text-stop">Inspection failed: {(inspect.error as Error).message}</p>}
 
         {cur && (
@@ -82,6 +142,9 @@ export default function Inspect() {
               <ComputeBadge device={cur.device} ms={cur.latency_ms} />
               <span className="text-sm text-ink-dim">score {cur.score.toFixed(2)}</span>
               {cur.truth && <span className="text-sm text-ink-dim">ground truth: {cur.truth}</span>}
+              {current && current.id === cur.id && sampleTruth && (
+                <span className="text-sm text-ink-dim">This sample photo is known to be {sampleTruth}.</span>
+              )}
             </div>
             {cur.regions.length > 0 && (
               <ol className="flex flex-col gap-3">

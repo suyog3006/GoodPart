@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, conformal, learnThenTest } from "@/lib/api";
+import { api, readOnly, conformal, learnThenTest } from "@/lib/api";
 import { ScoreHistogram } from "@/components/ScoreHistogram";
 
 const pct = (x: number) => `${(x * 100).toFixed(x < 0.1 ? 1 : 0)}%`;
@@ -76,13 +76,13 @@ export default function Calibrate() {
           </p>
         </div>
 
-        {!api.demo ? (
+        {!readOnly(id) ? (
           <button onClick={() => apply.mutate()} disabled={apply.isPending}
                   className="rounded-sm bg-steel px-4 py-3 text-lg font-semibold text-tag-ink disabled:opacity-60">
             {apply.isPending ? "Applying…" : "Apply thresholds"}
           </button>
         ) : (
-          <p className="hatch p-2 text-sm text-hold">Demo mode: thresholds preview only.</p>
+          <p className="hatch p-2 text-sm text-hold">{api.demo ? "Demo mode: nothing is saved." : "Showcase station: thresholds preview only."}</p>
         )}
         {apply.isSuccess && <p className="text-pass">Thresholds applied to this station.</p>}
       </div>

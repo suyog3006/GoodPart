@@ -89,7 +89,43 @@ export type Zone = {
   max_count?: number | null;
 };
 
-export const DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+// Live when the GPU service answers; otherwise fall back to recorded results so the site always works.
+// NEXT_PUBLIC_DEMO_MODE=1 forces recorded results.
+let DEMO = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+let resolved: Promise<boolean> | null = null;
+
+export function resolveMode(): Promise<boolean> {
+  if (DEMO) return Promise.resolve(true);
+  resolved ??= (async () => {
+    try {
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 6000);
+      const r = await fetch("/api/gp/health", { signal: ctl.signal, cache: "no-store" });
+      clearTimeout(t);
+      DEMO = !r.ok;
+    } catch {
+      DEMO = true;
+    }
+    return DEMO;
+  })();
+  return resolved;
+}
+
+// Phone photos can exceed the 4.5 MB request limit of serverless hosting; the station works at
+// 768 px anyway, so send at most 1600 px on the long side as JPEG.
+async function shrink(file: File, maxSide = 1600): Promise<Blob> {
+  try {
+    const bmp = await createImageBitmap(file);
+    const s = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * s);
+    c.height = Math.round(bmp.height * s);
+    c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
+    return await new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error("encode failed"))), "image/jpeg", 0.92));
+  } catch {
+    return file;
+  }
+}
 
 async function demo<T>(path: string): Promise<T> {
   const r = await fetch(`/demo/${path}`);
@@ -101,7 +137,12 @@ async function live<T>(path: string, init?: RequestInit): Promise<T> {
   const r = await fetch(`/api/gp/${path}`, init);
   if (!r.ok) {
     const text = await r.text();
-    throw new Error(text || `${r.status} ${r.statusText}`);
+    let msg = text;
+    try {
+      const d = JSON.parse(text).detail;
+      msg = typeof d === "string" ? d : JSON.stringify(d);
+    } catch {}
+    throw new Error(msg || `${r.status} ${r.statusText}`);
   }
   return r.json();
 }
@@ -115,7 +156,9 @@ function withUrls(i: Omit<Inspection, "image_url" | "overlay_url"> & Partial<Ins
 }
 
 export const api = {
-  demo: DEMO,
+  get demo() {
+    return DEMO;
+  },
   health: () => (DEMO ? demo<{ device: string }>("health.json") : live<{ device: string }>("health")),
   stations: () => (DEMO ? demo<StationSummary[]>("stations.json") : live<StationSummary[]>("stations")),
   station: (id: string) => (DEMO ? demo<StationDetail>(`station_${id}.json`) : live<StationDetail>(`stations/${id}`)),
@@ -125,7 +168,7 @@ export const api = {
     ),
   inspect: async (id: string, file: File): Promise<Inspection & { overlay_png?: string; image_png?: string }> => {
     const fd = new FormData();
-    fd.append("file", file);
+    fd.append("file", await shrink(file), "part.jpg");
     const r = await live<Inspection & { overlay_png: string; image_png: string }>(`stations/${id}/inspect`, {
       method: "POST",
       body: fd,
@@ -151,9 +194,9 @@ export const api = {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name }),
     }),
-  uploadGood: (id: string, files: File[]) => {
+  uploadGood: async (id: string, files: File[]) => {
     const fd = new FormData();
-    files.forEach((f) => fd.append("files", f));
+    for (const f of files) fd.append("files", await shrink(f), f.name);
     return live<{ uploaded: { id: string; file: string; flags: string[]; sharpness: number; scale: unknown }[] }>(
       `stations/${id}/images`,
       { method: "POST", body: fd },
@@ -177,6 +220,11 @@ export type EvalBundle = {
   fewshot: Record<string, number | string>[];
   failures: { category: string; file: string; kind: string; score: number; image: string; overlay: string }[];
 };
+
+// Showcase stations accept inspections from anyone but cannot be changed from the public site.
+export function readOnly(id: string) {
+  return DEMO || id.startsWith("visa-");
+}
 
 // Same pass/review/reject rule as the backend, for live slider previews.
 export function band(score: number, tLow: number, tHigh: number): Decision {

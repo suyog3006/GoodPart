@@ -1,0 +1,56 @@
+{
+ "visa-candle": [
+  {
+   "src": "/samples/candle_0.jpg",
+   "truth": "defective",
+   "source": "candle/Data/Images/Anomaly/081.JPG"
+  },
+  {
+   "src": "/samples/candle_1.jpg",
+   "truth": "defective",
+   "source": "candle/Data/Images/Anomaly/014.JPG"
+  },
+  {
+   "src": "/samples/candle_2.jpg",
+   "truth": "defective",
+   "source": "candle/Data/Images/Anomaly/003.JPG"
+  },
+  {
+   "src": "/samples/candle_3.jpg",
+   "truth": "good",
+   "source": "candle/Data/Images/Normal/0994.JPG"
+  },
+  {
+   "src": "/samples/candle_4.jpg",
+   "truth": "good",
+   "source": "candle/Data/Images/Normal/0215.JPG"
+  }
+ ],
+ "visa-pcb1": [
+  {
+   "src": "/samples/pcb1_0.jpg",
+   "truth": "defective",
+   "source": "pcb1/Data/Images/Anomaly/031.JPG"
+  },
+  {
+   "src": "/samples/pcb1_1.jpg",
+   "truth": "defective",
+   "source": "pcb1/Data/Images/Anomaly/028.JPG"
+  },
+  {
+   "src": "/samples/pcb1_2.jpg",
+   "truth": "defective",
+   "source": "pcb1/Data/Images/Anomaly/017.JPG"
+  },
+  {
+   "src": "/samples/pcb1_3.jpg",
+   "truth": "good",
+   "source": "pcb1/Data/Images/Normal/0994.JPG"
+  },
+  {
+   "src": "/samples/pcb1_4.jpg",
+   "truth": "good",
+   "source": "pcb1/Data/Images/Normal/0725.JPG"
+  }
+ ]
+}
