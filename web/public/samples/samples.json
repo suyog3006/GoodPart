@@ -52,5 +52,275 @@
    "truth": "good",
    "source": "pcb1/Data/Images/Normal/0725.JPG"
   }
+ ],
+ "visa-capsules": [
+  {
+   "src": "/samples/capsules_0.jpg",
+   "truth": "defective",
+   "source": "capsules/Data/Images/Anomaly/081.JPG"
+  },
+  {
+   "src": "/samples/capsules_1.jpg",
+   "truth": "defective",
+   "source": "capsules/Data/Images/Anomaly/014.JPG"
+  },
+  {
+   "src": "/samples/capsules_2.jpg",
+   "truth": "defective",
+   "source": "capsules/Data/Images/Anomaly/003.JPG"
+  },
+  {
+   "src": "/samples/capsules_3.jpg",
+   "truth": "good",
+   "source": "capsules/Data/Images/Normal/261.JPG"
+  },
+  {
+   "src": "/samples/capsules_4.jpg",
+   "truth": "good",
+   "source": "capsules/Data/Images/Normal/483.JPG"
+  }
+ ],
+ "visa-cashew": [
+  {
+   "src": "/samples/cashew_0.jpg",
+   "truth": "defective",
+   "source": "cashew/Data/Images/Anomaly/081.JPG"
+  },
+  {
+   "src": "/samples/cashew_1.jpg",
+   "truth": "defective",
+   "source": "cashew/Data/Images/Anomaly/014.JPG"
+  },
+  {
+   "src": "/samples/cashew_2.jpg",
+   "truth": "defective",
+   "source": "cashew/Data/Images/Anomaly/003.JPG"
+  },
+  {
+   "src": "/samples/cashew_3.jpg",
+   "truth": "good",
+   "source": "cashew/Data/Images/Normal/487.JPG"
+  },
+  {
+   "src": "/samples/cashew_4.jpg",
+   "truth": "good",
+   "source": "cashew/Data/Images/Normal/260.JPG"
+  }
+ ],
+ "visa-chewinggum": [
+  {
+   "src": "/samples/chewinggum_0.jpg",
+   "truth": "defective",
+   "source": "chewinggum/Data/Images/Anomaly/081.JPG"
+  },
+  {
+   "src": "/samples/chewinggum_1.jpg",
+   "truth": "defective",
+   "source": "chewinggum/Data/Images/Anomaly/014.JPG"
+  },
+  {
+   "src": "/samples/chewinggum_2.jpg",
+   "truth": "defective",
+   "source": "chewinggum/Data/Images/Anomaly/003.JPG"
+  },
+  {
+   "src": "/samples/chewinggum_3.jpg",
+   "truth": "good",
+   "source": "chewinggum/Data/Images/Normal/487.JPG"
+  },
+  {
+   "src": "/samples/chewinggum_4.jpg",
+   "truth": "good",
+   "source": "chewinggum/Data/Images/Normal/435.JPG"
+  }
+ ],
+ "visa-fryum": [
+  {
+   "src": "/samples/fryum_0.jpg",
+   "truth": "defective",
+   "source": "fryum/Data/Images/Anomaly/081.JPG"
+  },
+  {
+   "src": "/samples/fryum_1.jpg",
+   "truth": "defective",
+   "source": "fryum/Data/Images/Anomaly/014.JPG"
+  },
+  {
+   "src": "/samples/fryum_2.jpg",
+   "truth": "defective",
+   "source": "fryum/Data/Images/Anomaly/003.JPG"
+  },
+  {
+   "src": "/samples/fryum_3.jpg",
+   "truth": "good",
+   "source": "fryum/Data/Images/Normal/487.JPG"
+  },
+  {
+   "src": "/samples/fryum_4.jpg",
+   "truth": "good",
+   "source": "fryum/Data/Images/Normal/260.JPG"
+  }
+ ],
+ "visa-macaroni1": [
+  {
+   "src": "/samples/macaroni1_0.jpg",
+   "truth": "defective",
+   "source": "macaroni1/Data/Images/Anomaly/081.JPG"
+  },
+  {
+   "src": "/samples/macaroni1_1.jpg",
+   "truth": "defective",
+   "source": "macaroni1/Data/Images/Anomaly/014.JPG"
+  },
+  {
+   "src": "/samples/macaroni1_2.jpg",
+   "truth": "defective",
+   "source": "macaroni1/Data/Images/Anomaly/003.JPG"
+  },
+  {
+   "src": "/samples/macaroni1_3.jpg",
+   "truth": "good",
+   "source": "macaroni1/Data/Images/Normal/0994.JPG"
+  },
+  {
+   "src": "/samples/macaroni1_4.jpg",
+   "truth": "good",
+   "source": "macaroni1/Data/Images/Normal/0215.JPG"
+  }
+ ],
+ "visa-macaroni2": [
+  {
+   "src": "/samples/macaroni2_0.jpg",
+   "truth": "defective",
+   "source": "macaroni2/Data/Images/Anomaly/081.JPG"
+  },
+  {
+   "src": "/samples/macaroni2_1.jpg",
+   "truth": "defective",
+   "source": "macaroni2/Data/Images/Anomaly/014.JPG"
+  },
+  {
+   "src": "/samples/macaroni2_2.jpg",
+   "truth": "defective",
+   "source": "macaroni2/Data/Images/Anomaly/003.JPG"
+  },
+  {
+   "src": "/samples/macaroni2_3.jpg",
+   "truth": "good",
+   "source": "macaroni2/Data/Images/Normal/0994.JPG"
+  },
+  {
+   "src": "/samples/macaroni2_4.jpg",
+   "truth": "good",
+   "source": "macaroni2/Data/Images/Normal/0215.JPG"
+  }
+ ],
+ "visa-pcb2": [
+  {
+   "src": "/samples/pcb2_0.jpg",
+   "truth": "defective",
+   "source": "pcb2/Data/Images/Anomaly/081.JPG"
+  },
+  {
+   "src": "/samples/pcb2_1.jpg",
+   "truth": "defective",
+   "source": "pcb2/Data/Images/Anomaly/014.JPG"
+  },
+  {
+   "src": "/samples/pcb2_2.jpg",
+   "truth": "defective",
+   "source": "pcb2/Data/Images/Anomaly/003.JPG"
+  },
+  {
+   "src": "/samples/pcb2_3.jpg",
+   "truth": "good",
+   "source": "pcb2/Data/Images/Normal/0994.JPG"
+  },
+  {
+   "src": "/samples/pcb2_4.jpg",
+   "truth": "good",
+   "source": "pcb2/Data/Images/Normal/0159.JPG"
+  }
+ ],
+ "visa-pcb3": [
+  {
+   "src": "/samples/pcb3_0.jpg",
+   "truth": "defective",
+   "source": "pcb3/Data/Images/Anomaly/081.JPG"
+  },
+  {
+   "src": "/samples/pcb3_1.jpg",
+   "truth": "defective",
+   "source": "pcb3/Data/Images/Anomaly/014.JPG"
+  },
+  {
+   "src": "/samples/pcb3_2.jpg",
+   "truth": "defective",
+   "source": "pcb3/Data/Images/Anomaly/003.JPG"
+  },
+  {
+   "src": "/samples/pcb3_3.jpg",
+   "truth": "good",
+   "source": "pcb3/Data/Images/Normal/0488.JPG"
+  },
+  {
+   "src": "/samples/pcb3_4.jpg",
+   "truth": "good",
+   "source": "pcb3/Data/Images/Normal/0159.JPG"
+  }
+ ],
+ "visa-pcb4": [
+  {
+   "src": "/samples/pcb4_0.jpg",
+   "truth": "defective",
+   "source": "pcb4/Data/Images/Anomaly/081.JPG"
+  },
+  {
+   "src": "/samples/pcb4_1.jpg",
+   "truth": "defective",
+   "source": "pcb4/Data/Images/Anomaly/014.JPG"
+  },
+  {
+   "src": "/samples/pcb4_2.jpg",
+   "truth": "defective",
+   "source": "pcb4/Data/Images/Anomaly/003.JPG"
+  },
+  {
+   "src": "/samples/pcb4_3.jpg",
+   "truth": "good",
+   "source": "pcb4/Data/Images/Normal/0488.JPG"
+  },
+  {
+   "src": "/samples/pcb4_4.jpg",
+   "truth": "good",
+   "source": "pcb4/Data/Images/Normal/0159.JPG"
+  }
+ ],
+ "visa-pipe_fryum": [
+  {
+   "src": "/samples/pipe_fryum_0.jpg",
+   "truth": "defective",
+   "source": "pipe_fryum/Data/Images/Anomaly/081.JPG"
+  },
+  {
+   "src": "/samples/pipe_fryum_1.jpg",
+   "truth": "defective",
+   "source": "pipe_fryum/Data/Images/Anomaly/014.JPG"
+  },
+  {
+   "src": "/samples/pipe_fryum_2.jpg",
+   "truth": "defective",
+   "source": "pipe_fryum/Data/Images/Anomaly/003.JPG"
+  },
+  {
+   "src": "/samples/pipe_fryum_3.jpg",
+   "truth": "good",
+   "source": "pipe_fryum/Data/Images/Normal/487.JPG"
+  },
+  {
+   "src": "/samples/pipe_fryum_4.jpg",
+   "truth": "good",
+   "source": "pipe_fryum/Data/Images/Normal/260.JPG"
+  }
  ]
 }

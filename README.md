@@ -550,6 +550,10 @@ python scripts/api_smoke.py                                    # end-to-end: bui
 
 PyTorch on ROCm exposes AMD GPUs through the `cuda` device name, so `DEVICE=cuda` is correct on AMD hardware.
 
+### Sample products
+
+The hosted app ships 12 ready-made sample products, one per VisA category (candles, capsules, cashew nut, chewing gum, wheel snack, pipe snack, two macaroni trays and four circuit boards), trained and evaluated in section 7. Anyone can pick one on the Inspect page and upload a photo or click a sample photo; they are read-only, so their thresholds and history cannot be changed from the public site. Register them on a GPU machine with `python scripts/seed_live.py` after the evaluation run.
+
 ### Saved stations
 
 A station is built once and saved on the GPU machine: its good photos, its trained memory banks, its calibration and its inspection history (`/data/store`: SQLite database, images, one `<station>.pkl` per station). It survives API restarts and reboots, and setup can be resumed at any time from the Stations page; nothing is uploaded twice. Photos upload a few at a time, so any number works through the hosted app.

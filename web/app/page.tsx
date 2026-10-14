@@ -28,13 +28,17 @@ function remember(id: string) {
   } catch {}
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- meta is free-form JSON from the service
+const metaOf = (p: StationSummary) => p.meta as Record<string, any>;
+const isSample = (p: StationSummary) => p.id.startsWith("visa-") || !!metaOf(p).sample;
+
 function summary(p: StationSummary) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- meta is free-form JSON from the service
-  const m = p.meta as Record<string, any>;
+  const m = metaOf(p);
   const a = m.calibration?.alpha_guaranteed;
-  const parts = [`learned from ${m.n_build ?? "?"} good photos`];
+  const parts = [`Learned from ${m.n_build ?? "?"} good photos`];
   if (typeof a === "number") parts.push(`good parts wrongly rejected at most ${(a * 100).toFixed(a < 0.1 ? 1 : 0)}% of the time`);
-  return parts.join(", ");
+  const lead = isSample(p) ? `Sample product from the VisA dataset: ${m.description ?? p.name} ` : "Your saved product. ";
+  return `${lead}${parts.join(", ")}.`;
 }
 
 function Inspect() {
@@ -46,6 +50,11 @@ function Inspect() {
     queryFn: async () => ((await (await fetch("/samples/samples.json")).json()) as Record<string, Sample[]>),
   });
   const ready = useMemo(() => (products.data ?? []).filter((p) => p.status === "ready"), [products.data]);
+  const yours = useMemo(() => ready.filter((p) => !isSample(p)), [ready]);
+  const sampleProducts = useMemo(
+    () => ready.filter(isSample).sort((x, y) => x.name.localeCompare(y.name)),
+    [ready],
+  );
   const learning = useMemo(() => (products.data ?? []).filter((p) => p.status !== "ready"), [products.data]);
 
   const [selected, setSelected] = useState<string | null>(null);
@@ -55,9 +64,9 @@ function Inspect() {
     const fromLink = params.get("product");
     if (selected && (!fromLink || fromLink === selected)) return;
     const all = products.data.map((p) => p.id);
-    const want = [params.get("product"), remembered(), ready[0]?.id].find((x) => x && all.includes(x));
+    const want = [params.get("product"), remembered(), yours[0]?.id, sampleProducts[0]?.id].find((x) => x && all.includes(x));
     if (want) setSelected(want);
-  }, [products.data, params, ready, selected]);
+  }, [products.data, params, yours, sampleProducts, selected]);
 
   // Remember the product however it was chosen (dropdown, link or a product page button).
   useEffect(() => {
@@ -87,8 +96,8 @@ function Inspect() {
     send(new File([blob], "sample.jpg", { type: "image/jpeg" }), sm.truth);
   }
 
-  // "Candle (VisA sample)" -> "Candle" for use inside sentences.
-  const productName = (product?.name ?? "part").replace(/\s*\(.*\)\s*$/, "");
+  // How the product reads inside a sentence: "a tray of candles", "a laptop".
+  const productName = product ? (metaOf(product).noun ?? product.name.replace(/\s*\(.*\)\s*$/, "")) : "part";
 
   return (
     <div className="flex flex-col gap-8">
@@ -100,9 +109,14 @@ function Inspect() {
             <select value={selected ?? ""} onChange={(e) => choose(e.target.value)} disabled={products.isLoading}
                     className="min-w-72 rounded-sm border border-rule bg-housing px-3 py-3 font-display text-2xl font-semibold">
               {!selected && <option value="" disabled>{products.isLoading ? "Loading products…" : "Choose a product"}</option>}
-              {ready.length > 0 && (
-                <optgroup label="Ready to inspect">
-                  {ready.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {yours.length > 0 && (
+                <optgroup label="Your products">
+                  {yours.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </optgroup>
+              )}
+              {sampleProducts.length > 0 && (
+                <optgroup label="Sample products">
+                  {sampleProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </optgroup>
               )}
               {learning.length > 0 && (
@@ -114,8 +128,8 @@ function Inspect() {
             </select>
           </label>
           {product?.status === "ready" && (
-            <p className="pb-3 text-[15px] text-ink-dim">
-              Saved product, {summary(product)}.{" "}
+            <p className="max-w-[70ch] pb-3 text-[15px] text-ink-dim">
+              {summary(product)}{" "}
               <Link href={`/stations/${product.id}`} className="text-steel underline">History and settings</Link>
             </p>
           )}
@@ -161,7 +175,9 @@ function Inspect() {
               <div className="flex flex-col gap-3">
                 <PhotoDrop onFile={(f) => send(f)} busy={pending}
                            title={`Take or choose one photo of a ${productName}`}
-                           hint={<>Photograph it the same way as the good photos: same camera distance, lighting and background. Photos are kept in this product&apos;s history.</>} />
+                           hint={isSample(product)
+                             ? <>This sample product learned the exact items in the VisA dataset photos, so photos of other objects will be rejected as unusual. The sample photos below are the easiest way to try it.</>
+                             : <>Photograph it the same way as the good photos: same camera distance, lighting and background. Photos are kept in this product&apos;s history.</>} />
                 <button onClick={() => setCamera((c) => !c)} className="self-start rounded-sm border border-rule px-3 py-2 text-[15px]">
                   {camera ? "Close camera" : "Use this device's camera"}
                 </button>

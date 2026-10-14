@@ -32,9 +32,13 @@ from goodpart.register import align
 from goodpart.station import Station
 
 STORE = config.STORE_DIR
-# Shared showcase stations: anyone may inspect parts on them, but nobody can change their thresholds,
-# zones or review labels through the API.
+# Shared sample products: anyone may inspect parts on them, but nobody can change their thresholds,
+# zones or review labels through the API. Entries ending in "*" are id prefixes (e.g. "visa-*").
 READONLY = {x.strip() for x in __import__("os").environ.get("GOODPART_READONLY_STATIONS", "").split(",") if x.strip()}
+
+
+def is_readonly(sid: str) -> bool:
+    return any(sid.startswith(r[:-1]) if r.endswith("*") else sid == r for r in READONLY)
 STATIONS_DIR = STORE / "stations"
 IMG_DIR = STORE / "images"
 DB_PATH = STORE / "goodpart.db"
@@ -106,14 +110,26 @@ def backbones():
 
 @app.on_event("startup")
 def _warm():
-    """Load models and the showcase stations' memory banks before the first visitor arrives."""
+    """Load the models and compile the GPU kernels before the first visitor arrives, then load every
+    sample product's memory banks in the background (each is ~2.5 GB, so loading all takes a while)."""
     backbones()
-    for sid in READONLY:
+    con = db()
+    ids = [r["id"] for r in con.execute("SELECT id FROM station WHERE status='ready'") if is_readonly(r["id"])]
+    for sid in ids[:1]:
         try:
             # One dummy inspection compiles the GPU kernels (~7 s on the first call, ~80 ms after).
             get_station(sid).run([np.zeros((768, 768, 3), np.uint8)], maps=True)
         except HTTPException:
             pass
+
+    def preload():
+        for sid in ids[1:]:
+            try:
+                get_station(sid)
+            except Exception:
+                pass
+
+    threading.Thread(target=preload, daemon=True).start()
 
 
 def get_station(sid: str) -> Station:
@@ -214,7 +230,7 @@ def delete_station(sid: str):
     """Delete a station with its photos, inspections and trained memory banks."""
     import shutil
 
-    if sid in READONLY:
+    if is_readonly(sid):
         raise HTTPException(403, "This showcase station is read-only.")
     con = db()
     station_row(con, sid)
@@ -256,7 +272,7 @@ def good_thumb(sid: str, iid: str):
 
 @app.post("/stations/{sid}/images", dependencies=[Depends(auth)])
 async def upload_good(sid: str, files: list[UploadFile] = File(...)):
-    if sid in READONLY:
+    if is_readonly(sid):
         raise HTTPException(403, "This showcase station is read-only. Set up your own station to change it.")
     con = db()
     station_row(con, sid)
@@ -333,7 +349,7 @@ def _build_job(sid: str, cfg: dict):
 
 @app.post("/stations/{sid}/build", dependencies=[Depends(auth)])
 def build(sid: str, alpha: float = 0.01, review_cap: float = 0.15):
-    if sid in READONLY:
+    if is_readonly(sid):
         raise HTTPException(403, "This showcase station is read-only. Set up your own station to change it.")
     con = db()
     station_row(con, sid)
@@ -390,7 +406,7 @@ class CalibIn(BaseModel):
 @app.post("/stations/{sid}/calibrate", dependencies=[Depends(auth)])
 def recalibrate(sid: str, body: CalibIn):
     """Live recalibration from stored calibration + synthetic scores (no GPU work)."""
-    if sid in READONLY:
+    if is_readonly(sid):
         raise HTTPException(403, "This showcase station is read-only. Set up your own station to change it.")
     s = get_station(sid)
     cal = st.calibrate(s.cal_scores, body.alpha, body.review_cap, body.delta, s.synth_scores)
@@ -409,7 +425,7 @@ class ZonesIn(BaseModel):
 
 @app.put("/stations/{sid}/zones", dependencies=[Depends(auth)])
 def set_zones(sid: str, body: ZonesIn):
-    if sid in READONLY:
+    if is_readonly(sid):
         raise HTTPException(403, "This showcase station is read-only. Set up your own station to change it.")
     con = db()
     station_row(con, sid)
@@ -515,7 +531,7 @@ def review(iid: str, body: ReviewIn):
     r = con.execute("SELECT * FROM inspection WHERE id=?", (iid,)).fetchone()
     if not r:
         raise HTTPException(404)
-    if r["station"] in READONLY:
+    if is_readonly(r["station"]):
         raise HTTPException(403, "Review labels on this showcase station are not saved.")
     con.execute("INSERT OR REPLACE INTO review VALUES (?,?,?,?)", (iid, body.label, body.defect_type, time.time()))
     con.commit()

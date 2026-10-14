@@ -27,22 +27,47 @@ from goodpart.eval.run import make_backbones  # noqa: E402
 from goodpart.station import Station  # noqa: E402
 from goodpart.stress import pod  # noqa: E402
 
-DISPLAY = {"candle": "Candle (VisA sample)", "pcb1": "PCB (VisA sample)"}
+# Sample products shown to every visitor: (name, noun used in sentences, one-line description).
+CATALOG = {
+    "candle": ("Candles", "tray of candles", "Four white tea-light candles on a dark tray."),
+    "capsules": ("Capsules", "tray of capsules", "About 20 green soft-gel capsules on a grey tray."),
+    "cashew": ("Cashew nut", "cashew nut", "A single cashew on a dark textured surface."),
+    "chewinggum": ("Chewing gum", "piece of chewing gum", "A single white gum pellet on a dark surface."),
+    "fryum": ("Wheel snack", "wheel snack", "A wheel-shaped fried snack (fryum) on a green surface."),
+    "macaroni1": ("Macaroni, tray A", "macaroni tray", "Four elbow macaroni neatly placed on a green tray."),
+    "macaroni2": ("Macaroni, tray B", "macaroni tray", "Four elbow macaroni on a textured green surface."),
+    "pcb1": ("Ultrasonic sensor board, front", "sensor board", "HC-SR04 ultrasonic distance sensor, front side."),
+    "pcb2": ("Ultrasonic sensor board, back", "sensor board", "HC-SR04 ultrasonic distance sensor, component side."),
+    "pcb3": ("IR obstacle sensor board", "sensor board", "Infrared obstacle-detection sensor module."),
+    "pcb4": ("USB charger board", "charger board", "Micro-USB lithium battery charging module."),
+    "pipe_fryum": ("Pipe snack", "pipe snack", "A tube-shaped fried snack (fryum) on a black surface."),
+}
 DEFAULT_CFG = {"dino": "facebook/dinov2-base", "dino_size": 672, "wrn_size": 320}
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--categories", nargs="*", default=["candle", "pcb1"])
-    ap.add_argument("--n", type=int, default=40)
+    ap.add_argument("--categories", nargs="*", default=list(CATALOG))
+    ap.add_argument("--n", type=int, default=20)
     ap.add_argument("--base", default="http://localhost:8000")
     a = ap.parse_args()
     h = {"Authorization": f"Bearer {os.environ.get('GOODPART_API_TOKEN', config.API_TOKEN)}"}
     bb = make_backbones(DEFAULT_CFG)
     out_dir = config.STORE_DIR / "stations"
-    con = sqlite3.connect(config.STORE_DIR / "goodpart.db")
+    con = sqlite3.connect(config.STORE_DIR / "goodpart.db", timeout=30)
+    new = []
     for cat in a.categories:
         sid = f"visa-{cat}"
+        name, noun, desc = CATALOG[cat]
+        row = con.execute("SELECT meta FROM station WHERE id=?", (sid,)).fetchone()
+        if row and (out_dir / f"{sid}.pkl").exists():
+            # Already registered: refresh the name and description, keep its inspection history.
+            meta = {**json.loads(row[0] or "{}"), "noun": noun, "description": desc, "sample": True}
+            con.execute("UPDATE station SET name=?, meta=? WHERE id=?", (name, json.dumps(meta), sid))
+            con.commit()
+            print(sid, "renamed to", name, flush=True)
+            continue
+        new.append(cat)
         pkl = sorted(glob.glob(str(config.STORE_DIR / "stations" / f"visa_{cat}_k*.pkl")),
                      key=lambda p: int(p.rsplit("_k", 1)[1].split(".")[0]))[-1]
         k = int(pkl.rsplit("_k", 1)[1].split(".")[0])
@@ -56,10 +81,10 @@ def main():
         f = pod.fit(m.size_px, m.hit)
         meta = {"n_build": k, "n_cal": st.calibration.n_cal, "calibration": st.calibration.to_dict(),
                 "selection": st.selection, "a90_95_px": f.get("a90_95"), "device": config.device_label(),
-                "source": "VisA (CC BY 4.0), evaluated station"}
+                "source": "VisA (CC BY 4.0), evaluated station", "noun": noun, "description": desc, "sample": True}
         con.execute("DELETE FROM inspection WHERE station=?", (sid,))
         con.execute("INSERT OR REPLACE INTO station (id, name, created, status, mm_per_px, zones, meta) "
-                    "VALUES (?,?,?,?,?,?,?)", (sid, DISPLAY.get(cat, f"{cat} (VisA sample)"), time.time(), "ready", None, "[]",
+                    "VALUES (?,?,?,?,?,?,?)", (sid, name, time.time(), "ready", None, "[]",
                                               json.dumps(meta, default=float)))
         # Reference image for the zone editor.
         ref_dir = config.STORE_DIR / "images" / sid / "good"
@@ -70,8 +95,8 @@ def main():
         con.commit()
         print(sid, "registered from", Path(pkl).name, flush=True)
 
-    # Seed through the real API so the records are identical to live uploads.
-    for cat in a.categories:
+    # Seed new products through the real API so the records are identical to live uploads.
+    for cat in new:
         sid = f"visa-{cat}"
         sp = visa.load(cat)
         rng = np.random.default_rng(1)

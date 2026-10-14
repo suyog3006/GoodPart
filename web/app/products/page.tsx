@@ -19,6 +19,7 @@ function StationRow({ s }: { s: StationSummary }) {
           className="grid grid-cols-2 gap-4 border-t border-rule px-1 py-5 hover:bg-housing sm:grid-cols-[2fr_1fr_1fr_1fr_1.4fr] sm:items-center">
       <div className="col-span-2 sm:col-span-1">
         <div className="font-display text-2xl font-semibold leading-tight">{s.name}</div>
+        {m.description && <div className="text-sm text-ink">{m.description}</div>}
         <div className="text-sm text-ink-dim">
           {s.status === "ready"
             ? `${m.n_build ?? "?"} good photos in memory, ${cal.n_cal ?? "?"} for calibration`
