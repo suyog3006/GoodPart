@@ -118,6 +118,14 @@ class Station:
         self._defects = defects  # kept in memory for galleries; not pickled
         return self
 
+    def fit_region_threshold(self, cal_imgs, q: float = 0.999):
+        """Pixel level that good calibration parts exceed only (1 - q) of the time."""
+        maps = np.concatenate([self.run(list(cal_imgs[i:i + 50]), maps=True).maps[:, ::2, ::2]
+                               for i in range(0, len(cal_imgs), 50)])
+        self.region_threshold = float(np.quantile(maps, q))
+        self.has_region_threshold = True
+        return self.region_threshold
+
     def decide(self, score):
         return self.calibration.decide(score)
 
@@ -143,6 +151,7 @@ class Station:
                   "synth_scores", "defects_meta", "choice", "region_threshold"):
             if k in s:
                 setattr(st_, k, s[k])
+        st_.has_region_threshold = "region_threshold" in s
         for k, b in s["banks"].items():
             st_.dets[k].bank = b.to(device)
         a = st_.dets["A"]

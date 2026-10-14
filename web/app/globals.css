@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+/* GoodPart tokens. Colours follow shop-floor safety convention: green = safe to ship,
+   yellow = hold for an inspector, red = stop. Graphite surfaces echo machine-tool housings. */
+:root {
+  --graphite: #1d2228;
+  --housing: #262d34;
+  --housing-2: #303841;
+  --rule: #3c4550;
+  --ink: #e8e6df;
+  --ink-dim: #a3a9a8;
+  --pass: #2f9e5e;
+  --hold: #f0bf2c;
+  --stop: #d43d2f;
+  --steel: #8fb3c9;
+  --tag-ink: #16191c;
+  /* Chart series (validated for CVD separation on the housing surface): good parts, defects. */
+  --series-good: #3f8fd0;
+  --series-defect: #c9772f;
+}
+
+:root[data-theme="light"] {
+  --graphite: #e9e7e1;
+  --housing: #f6f5f1;
+  --housing-2: #ffffff;
+  --rule: #c9c6bd;
+  --ink: #1b1f23;
+  --ink-dim: #5b6166;
+  --steel: #2f6585;
+  --series-good: #2a78d6;
+  --series-defect: #c4651c;
+}
+
+@theme inline {
+  --color-graphite: var(--graphite);
+  --color-housing: var(--housing);
+  --color-housing-2: var(--housing-2);
+  --color-rule: var(--rule);
+  --color-ink: var(--ink);
+  --color-ink-dim: var(--ink-dim);
+  --color-pass: var(--pass);
+  --color-hold: var(--hold);
+  --color-stop: var(--stop);
+  --color-steel: var(--steel);
+  --color-tag-ink: var(--tag-ink);
+  --font-sans: var(--font-barlow);
+  --font-display: var(--font-barlow-condensed);
+}
+
+html,
+body {
+  background: var(--graphite);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-barlow), system-ui, sans-serif;
+  font-feature-settings: "tnum" 1;
+}
+
+:focus-visible {
+  outline: 3px solid var(--steel);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* The inspection tag: a hang tag with a punched eyelet, the one bold element on screen. */
+.qc-tag {
+  position: relative;
+  clip-path: polygon(14% 0, 100% 0, 100% 100%, 14% 100%, 0 50%);
+  color: var(--tag-ink);
+}
+.qc-tag::before {
+  content: "";
+  position: absolute;
+  left: 6%;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  margin-top: -9px;
+  border-radius: 50%;
+  background: var(--graphite);
+  box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.25);
+}
+.qc-tag-stamp {
+  animation: stamp 260ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+@keyframes stamp {
+  from {
+    transform: scale(1.12);
+    opacity: 0.4;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Hatched fill marks recorded (demo) content, like a drawing's "reference only" hatch. */
+.hatch {
+  background-image: repeating-linear-gradient(-45deg, transparent 0 6px, rgba(240, 191, 44, 0.18) 6px 8px);
+}

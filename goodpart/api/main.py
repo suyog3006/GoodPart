@@ -24,12 +24,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from goodpart import config
+from goodpart import config, pipeline
 from goodpart.calibrate import stats as st
 from goodpart.describe import vlm
 from goodpart.drift import monitor
 from goodpart.register import align
-from goodpart.spec import rules
 from goodpart.station import Station
 
 STORE = config.STORE_DIR
@@ -190,6 +189,8 @@ async def upload_good(sid: str, files: list[UploadFile] = File(...)):
         p = d / f"{iid}.png"
         cv2.imwrite(str(p), cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
         scale = align.detect_scale(rgb)
+        if scale:  # store at the 768 px working resolution used everywhere downstream
+            scale["mm_per_px"] *= rgb.shape[1] / 768
         q["scale"] = scale
         con.execute("INSERT INTO image VALUES (?,?,?,?,?)", (iid, sid, str(p), "good", json.dumps(q)))
         report.append({"id": iid, "file": f.filename, **q})
@@ -270,6 +271,19 @@ def station_detail(sid: str):
     return d
 
 
+@app.get("/stations/{sid}/reference", dependencies=[Depends(auth)])
+def reference_image(sid: str):
+    """Reference photo for the zone editor: the sharpest, most typical good image."""
+    con = db()
+    rows = con.execute("SELECT path FROM image WHERE station=? AND role='good'", (sid,)).fetchall()
+    if not rows:
+        raise HTTPException(404, "no good images uploaded")
+    imgs = [cv2.cvtColor(cv2.imread(r["path"]), cv2.COLOR_BGR2RGB) for r in rows[:60]]
+    ref = cv2.resize(imgs[align.pick_reference(imgs)], (768, 768), interpolation=cv2.INTER_AREA)
+    ok, buf = cv2.imencode(".jpg", cv2.cvtColor(ref, cv2.COLOR_RGB2BGR))
+    return StreamingResponse(io.BytesIO(buf.tobytes()), media_type="image/jpeg")
+
+
 class CalibIn(BaseModel):
     alpha: float
     review_cap: float
@@ -331,31 +345,13 @@ async def inspect(sid: str, file: UploadFile = File(...), name_defects: bool = F
     rgb = read_image(await file.read())
     size = 768
     img = cv2.resize(rgb, (size, size), interpolation=cv2.INTER_AREA)
-    with _lock:
-        out = s.run([img], maps=True)
-    score = float(out.score[0])
-    heat = out.maps[0]
-    band = str(s.decide(np.array([score]))[0])
     zones = json.loads(row["zones"])
-    mm = row["mm_per_px"] * (rgb.shape[1] / size) if row["mm_per_px"] else None
-    regions = rules.extract_regions(heat, s.region_threshold, (size, size)) if band != "pass" else []
-    out_of_tol, reasons = rules.apply_rules(regions, zones, mm, None)
+    mm = row["mm_per_px"]  # mm per pixel at the 768 px working resolution
+    with _lock:
+        res = pipeline.decide(s, img, zones, mm)
+    score, heat, decision, band, reason = res["score"], res["heat"], res["decision"], res["band"], res["reason"]
+    regions = res["regions"]
     cal = s.calibration
-    if out_of_tol:
-        decision, reason = "reject", "; ".join(reasons)
-    elif band != "pass" and zones and mm and regions:
-        decision = "pass"
-        reason = "anomalies found but within spec: " + "; ".join(r.reason for r in regions)
-    else:
-        decision = band
-        reason = {"pass": f"score {score:.2f} below pass threshold {cal.t_low:.2f}",
-                  "review": f"score {score:.2f} between {cal.t_low:.2f} and {cal.t_high:.2f}: needs an inspector",
-                  "reject": f"score {score:.2f} above reject threshold {cal.t_high:.2f}"}[band]
-        if regions and band != "pass":
-            r0 = regions[0]
-            where = f" in {r0.zone}" if r0.zone else ""
-            size_txt = f"{r0.length_mm:.1f} mm" if r0.length_mm else f"{r0.length_px:.0f} px"
-            reason += f"; largest region {size_txt}{where}"
     latency_ms = (time.perf_counter() - t0) * 1000
     iid = uuid.uuid4().hex[:12]
     d = IMG_DIR / sid / "inspections"
@@ -365,7 +361,7 @@ async def inspect(sid: str, file: UploadFile = File(...), name_defects: bool = F
     np.save(hp, heat.astype(np.float16))
     reg = [r.to_dict() for r in regions]
     rec = {"id": iid, "station": sid, "created": time.time(), "score": score,
-           "z": {k: float(v[0]) for k, v in out.z.items()}, "decision": decision, "band": band, "reason": reason,
+           "z": res["z"], "decision": decision, "band": band, "reason": reason,
            "regions": reg, "device": config.device_label(), "latency_ms": latency_ms}
     con.execute("INSERT INTO inspection VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (iid, sid, rec["created"], score, json.dumps(rec["z"]), decision, band, reason,
