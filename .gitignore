@@ -13,3 +13,7 @@ __pycache__/
 results/*.log
 results/zeroshot/cache_*.jsonl
 .claude/
+
+# Local notes that may contain keys
+New Text Document*.txt
+*.key
