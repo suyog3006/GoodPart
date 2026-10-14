@@ -6,10 +6,10 @@ import type { Region } from "@/lib/api";
 export function InspectionViewer({ image, overlay, regions, size = 768 }: {
   image: string; overlay: string; regions: Region[]; size?: number;
 }) {
-  const [opacity, setOpacity] = useState(0.7);
+  const [opacity, setOpacity] = useState(1);
   const [showRegions, setShowRegions] = useState(true);
   return (
-    <figure className="w-full">
+    <figure className="mx-auto w-full max-w-[min(100%,78vh)]">
       <div className="relative aspect-square w-full overflow-hidden rounded-sm border border-rule bg-black">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={image} alt="Inspected part" className="absolute inset-0 h-full w-full object-contain" />

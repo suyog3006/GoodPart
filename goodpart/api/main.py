@@ -82,23 +82,39 @@ def publish(event: str, data: dict):
         q.put(msg)
 
 
-def backbones():
-    global _backbones
-    if _backbones is None:
-        from goodpart.models.backbones import DinoV2, WideResNet50
+_init_lock = threading.Lock()
 
-        dev = config.device()
-        _backbones = {"A": DinoV2(DEFAULT_CFG["dino"], DEFAULT_CFG["dino_size"], dev),
-                      "B": WideResNet50(DEFAULT_CFG["wrn_size"], dev)}
+
+def backbones():
+    """Load the feature extractors once. Guarded: transformers' lazy imports are not thread-safe."""
+    global _backbones
+    with _init_lock:
+        if _backbones is None:
+            from goodpart.models.backbones import DinoV2, WideResNet50
+
+            dev = config.device()
+            _backbones = {"A": DinoV2(DEFAULT_CFG["dino"], DEFAULT_CFG["dino_size"], dev),
+                          "B": WideResNet50(DEFAULT_CFG["wrn_size"], dev)}
     return _backbones
 
 
+@app.on_event("startup")
+def _warm():
+    backbones()
+
+
 def get_station(sid: str) -> Station:
+    bb = backbones()
+    with _init_lock:
+        return _load_station(sid, bb)
+
+
+def _load_station(sid: str, bb) -> Station:
     if sid not in _stations:
         p = STATIONS_DIR / f"{sid}.pkl"
         if not p.exists():
             raise HTTPException(404, "station not built")
-        _stations[sid] = Station.load(p, backbones(), config.device())
+        _stations[sid] = Station.load(p, bb, config.device())
     return _stations[sid]
 
 
@@ -161,6 +177,8 @@ def list_stations():
         d["zones"], d["meta"] = json.loads(d["zones"]), json.loads(d["meta"])
         c = con.execute("SELECT decision, COUNT(*) n FROM inspection WHERE station=? GROUP BY decision", (r["id"],))
         d["counts"] = {x["decision"]: x["n"] for x in c}
+        if d["status"] == "ready":
+            d["meta"]["drift"] = monitor.status(r["id"]).get("status", "unknown")
         out.append(d)
     return out
 
@@ -215,17 +233,26 @@ def _build_job(sid: str, cfg: dict):
             raise ValueError(f"need at least 8 usable good images, have {n}")
         rng = np.random.default_rng(0)
         order = rng.permutation(n)
-        # Split: ~55% build, ~45% calibration; stress defects are painted on the build images' copies.
+        # Split: ~55% build, ~45% calibration. Synthetic defects are painted on copies of the held-out
+        # calibration images: images already in the memory bank would match almost everywhere and make
+        # defects look artificially easy to miss. Synthetic scores never enter the false-reject guarantee.
         n_cal = max(4, int(n * 0.45))
         cal = [imgs[i] for i in order[:n_cal]]
         build = [imgs[i] for i in order[n_cal:]]
         publish("build", {"station": sid, "stage": "features", "progress": 0.1})
         with _lock:
             s = Station(backbones(), cfg)
-            s.build(build, cal, build, log=lambda m: publish("build", {"station": sid, "stage": "log", "msg": m}))
+            s.build(build, cal, cal, log=lambda m: publish("build", {"station": sid, "stage": "log", "msg": m}))
             s.save(STATIONS_DIR / f"{sid}.pkl")
             _stations[sid] = s
+        import pandas as pd
+        from goodpart.stress import pod
+
+        m = pd.DataFrame(s.defects_meta)
+        m["hit"] = s.synth_scores >= s.calibration.t_low
+        fit = pod.fit(m.size_px, m.hit)
         meta = {"n_build": len(build), "n_cal": len(cal), "timings": s.timings, "selection": s.selection,
+                "a90_95_px": fit.get("a90_95"),
                 "calibration": s.calibration.to_dict(), "device": config.device_label()}
         con.execute("UPDATE station SET status='ready', meta=? WHERE id=?", (json.dumps(meta, default=float), sid))
         con.commit()
@@ -319,7 +346,7 @@ def set_zones(sid: str, body: ZonesIn):
     return {"ok": True}
 
 
-def _name_regions(iid: str, rgb: np.ndarray, heat: np.ndarray, regions: list[dict], vmax: float):
+def _name_regions(iid: str, rgb: np.ndarray, heat: np.ndarray, regions: list[dict], lo: float, vmax: float):
     out = []
     h, w = rgb.shape[:2]
     for r in regions:
@@ -328,7 +355,7 @@ def _name_regions(iid: str, rgb: np.ndarray, heat: np.ndarray, regions: list[dic
         x0, y0, x1, y1 = max(0, x - pad), max(0, y - pad), min(w, x + bw + pad), min(h, y + bh + pad)
         crop = rgb[y0:y1, x0:x1]
         hm = cv2.resize(heat, (w, h))[y0:y1, x0:x1]
-        r["name"] = vlm.name_defect(crop, vlm.overlay(crop, hm, 0, vmax), r.get("length_mm"), r["elongation"])
+        r["name"] = vlm.name_defect(crop, vlm.overlay(crop, hm, lo, vmax), r.get("length_mm"), r["elongation"])
         out.append(r)
     con = db()
     con.execute("UPDATE inspection SET regions=? WHERE id=?", (json.dumps(out, default=float), iid))
@@ -367,14 +394,14 @@ async def inspect(sid: str, file: UploadFile = File(...), name_defects: bool = F
                 (iid, sid, rec["created"], score, json.dumps(rec["z"]), decision, band, reason,
                  json.dumps(reg, default=float), rec["device"], latency_ms, str(ip), str(hp)))
     con.commit()
-    vmax = max(s.region_threshold * 2, float(heat.max()))
+    lo, vmax = s.region_threshold * 0.5, s.region_threshold * 2
     rec["image_png"] = png_b64(img)
-    rec["overlay_png"] = png_b64(vlm.overlay(img, heat, 0, vmax))
-    rec["heatmap_range"] = [0, vmax]
+    rec["overlay_png"] = png_b64(vlm.overlay(img, heat, lo, vmax))
+    rec["heatmap_range"] = [lo, vmax]
     publish("inspection", {k: v for k, v in rec.items() if not k.endswith("_png")})
     monitor.observe(sid, score, decision, cal)
     if name_defects and reg:
-        threading.Thread(target=_name_regions, args=(iid, img, heat, reg, vmax), daemon=True).start()
+        threading.Thread(target=_name_regions, args=(iid, img, heat, reg, lo, vmax), daemon=True).start()
     return rec
 
 
@@ -396,7 +423,8 @@ def inspection_image(iid: str, overlay: bool = False):
     img = cv2.cvtColor(cv2.imread(r["image_path"]), cv2.COLOR_BGR2RGB)
     if overlay:
         heat = np.load(r["heatmap_path"]).astype(np.float32)
-        img = vlm.overlay(img, heat, 0, max(float(heat.max()), 1e-3))
+        t = get_station(r["station"]).region_threshold
+        img = vlm.overlay(img, heat, t * 0.5, t * 2)
     ok, buf = cv2.imencode(".jpg", cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
     return StreamingResponse(io.BytesIO(buf.tobytes()), media_type="image/jpeg")
 

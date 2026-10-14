@@ -101,8 +101,11 @@ def name_defect(crop, overlay, length_mm=None, elongation=1.0) -> dict:
     return {**template(length_mm, elongation), "source": "template", "errors": errors}
 
 
-def overlay(rgb, heat, lo: float, hi: float, alpha: float = 0.45) -> np.ndarray:
+def overlay(rgb, heat, lo: float, hi: float, alpha: float = 0.6) -> np.ndarray:
+    """Heatmap on a fixed scale [lo, hi]. Opacity grows with the score, so ordinary areas stay clear
+    and only unusual regions are coloured; images of one station are directly comparable."""
     h = np.clip((np.asarray(heat, np.float32) - lo) / max(hi - lo, 1e-6), 0, 1)
     h = cv2.resize(h, (rgb.shape[1], rgb.shape[0]), interpolation=cv2.INTER_LINEAR)
-    cm = cv2.cvtColor(cv2.applyColorMap((h * 255).astype(np.uint8), cv2.COLORMAP_JET), cv2.COLOR_BGR2RGB)
-    return (alpha * cm + (1 - alpha) * np.asarray(rgb)).astype(np.uint8)
+    cm = cv2.cvtColor(cv2.applyColorMap((h * 255).astype(np.uint8), cv2.COLORMAP_INFERNO), cv2.COLOR_BGR2RGB)
+    a = (alpha * np.clip(h * 1.5, 0, 1))[..., None]
+    return (a * cm + (1 - a) * np.asarray(rgb)).astype(np.uint8)

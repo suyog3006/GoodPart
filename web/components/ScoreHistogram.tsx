@@ -43,10 +43,10 @@ export function ScoreHistogram({ series, tLow, tHigh, height = 300 }: {
             <Bar key={s.key} dataKey={s.key} fill={s.color} radius={[4, 4, 0, 0]} isAnimationActive={false} />
           ))}
           <ReferenceLine x={nearest(data, tLow)} stroke="var(--pass)" strokeWidth={2}
-                         label={{ value: "Pass below", position: "insideTopLeft", fill: "var(--ink)", fontSize: 13 }} />
+                         label={{ value: "Pass below", position: "insideTopRight", fill: "var(--ink)", fontSize: 13 }} />
           {Number.isFinite(tHigh) && (
             <ReferenceLine x={nearest(data, tHigh)} stroke="var(--stop)" strokeWidth={2}
-                           label={{ value: "Reject above", position: "insideTopRight", fill: "var(--ink)", fontSize: 13 }} />
+                           label={{ value: "Reject above", position: "insideTopLeft", fill: "var(--ink)", fontSize: 13 }} />
           )}
         </BarChart>
       </ResponsiveContainer>

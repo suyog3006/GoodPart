@@ -4,7 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import { api, type StationSummary } from "@/lib/api";
 
 function pct(x: unknown) {
-  return typeof x === "number" ? `${(x * 100).toFixed(x < 0.01 ? 1 : 0)}%` : "n/a";
+  if (typeof x !== "number") return "n/a";
+  const v = x * 100;
+  return `${Number.isInteger(+v.toFixed(1)) ? v.toFixed(0) : v.toFixed(1)}%`;
 }
 
 function StationRow({ s }: { s: StationSummary }) {
@@ -31,7 +33,9 @@ function StationRow({ s }: { s: StationSummary }) {
       </div>
       <div>
         <div className="text-sm text-ink-dim">Drift</div>
-        <div className={`font-display text-2xl ${m.drift === "drift" ? "text-stop" : "text-pass"}`}>{m.drift === "drift" ? "Shifted" : "Stable"}</div>
+        <div className={`font-display text-2xl ${m.drift === "drift" ? "text-stop" : m.drift === "ok" ? "text-pass" : "text-ink-dim"}`}>
+          {m.drift === "drift" ? "Shifted" : m.drift === "ok" ? "Stable" : "Not enough data"}
+        </div>
       </div>
       <div className="col-span-2 sm:col-span-1">
         <div className="text-sm text-ink-dim">{total} inspected</div>

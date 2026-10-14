@@ -10,3 +10,6 @@ node_modules/
 .next/
 __pycache__/
 *.pyc
+results/*.log
+results/zeroshot/cache_*.jsonl
+.claude/

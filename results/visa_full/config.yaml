@@ -1,0 +1,46 @@
+alpha: 0.01
+categories:
+- candle
+- capsules
+- cashew
+- chewinggum
+- fryum
+- macaroni1
+- macaroni2
+- pcb1
+- pcb2
+- pcb3
+- pcb4
+- pipe_fryum
+coreset_ratio: 0.1
+delta: 0.1
+dino: facebook/dinov2-base
+dino_size: 672
+k_build:
+- 32
+- all
+map_size: 256
+mask_background: false
+max_bank_B: 100000
+name: visa_full
+review_cap: 0.15
+save_station: true
+seed: 0
+select_margin: 0.01
+stress_contrasts:
+- 0.1
+- 0.25
+- 0.5
+stress_per_cell: 6
+stress_sizes_px:
+- 3
+- 4
+- 6
+- 8
+- 11
+- 16
+- 22
+- 32
+- 45
+- 64
+wrn_size: 320

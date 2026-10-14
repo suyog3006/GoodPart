@@ -62,7 +62,7 @@ def export_station(cat: str, res_dir: Path, out: Path, n: int, bb, cfg) -> dict:
         r = pipeline.decide(st, img)
         lat = (time.perf_counter() - t0) * 1000
         heat = r["heat"]
-        vmax = max(st.region_threshold * 2, float(heat.max()))
+        lo, vmax = st.region_threshold * 0.5, st.region_threshold * 2
         regs = [g.to_dict() for g in r["regions"]]
         h, w = img.shape[:2]
         for g in regs[:3]:
@@ -70,11 +70,11 @@ def export_station(cat: str, res_dir: Path, out: Path, n: int, bb, cfg) -> dict:
             pad = max(24, int(0.5 * max(bw, bh)))
             x0, y0, x1, y1 = max(0, x - pad), max(0, y - pad), min(w, x + bw + pad), min(h, y + bh + pad)
             hm = cv2.resize(heat, (w, h))[y0:y1, x0:x1]
-            g["name"] = vlm.name_defect(img[y0:y1, x0:x1], vlm.overlay(img[y0:y1, x0:x1], hm, 0, vmax),
+            g["name"] = vlm.name_defect(img[y0:y1, x0:x1], vlm.overlay(img[y0:y1, x0:x1], hm, lo, vmax),
                                         None, g["elongation"])
         iid = f"{cat}-{j:03d}"
         jpg(out / sid / f"{iid}.jpg", img)
-        jpg(out / sid / f"{iid}_overlay.jpg", vlm.overlay(img, heat, 0, vmax))
+        jpg(out / sid / f"{iid}_overlay.jpg", vlm.overlay(img, heat, lo, vmax))
         items.append({"id": iid, "station": sid, "created": t_base + j * 60, "score": r["score"], "z": r["z"],
                       "decision": r["decision"], "band": r["band"], "reason": r["reason"], "regions": regs,
                       "device": config.device_label(), "latency_ms": lat,
@@ -136,7 +136,7 @@ def failures(res_dir: Path, out: Path, per_cat: int = 2) -> list[dict]:
                 img = np.asarray(sp.test[i])
                 hm = maps[i].astype(np.float32)
                 name = f"fail_{cat}_{i}"
-                jpg(out / "failures" / f"{name}.jpg", vlm.overlay(img, hm, 0, max(float(hm.max()), 3.0)), side=384)
+                jpg(out / "failures" / f"{name}.jpg", vlm.overlay(img, hm, 1.5, 6.0), side=384)
                 rows.append({"category": cat, "file": r["file"], "kind": kind, "score": float(r["score"]),
                              "image": f"/demo/failures/{name}.jpg", "overlay": f"/demo/failures/{name}.jpg"})
     return rows
