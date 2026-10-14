@@ -72,7 +72,7 @@ export default function Review() {
   const secsPer = done ? (Date.now() - started) / 1000 / done : null;
 
   if (list.isLoading) return <p className="text-ink-dim">Loading the queue…</p>;
-  if (!queue.length) return <p className="text-ink-dim">Nothing to review. Parts the station is unsure about will appear here.</p>;
+  if (!queue.length) return <p className="text-ink-dim">Nothing to review. Parts it is unsure about will appear here.</p>;
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -114,7 +114,7 @@ export default function Review() {
         </div>
         <p className="text-sm text-ink-dim">Arrow keys move between parts. Parts you confirm as good join the calibration set and tighten the guarantee.</p>
         {note && <p className="text-steel">{note}</p>}
-        {readOnly(id) && <p className="hatch p-2 text-sm text-hold">Labels on this showcase station are not saved.</p>}
+        {readOnly(id) && <p className="hatch p-2 text-sm text-hold">Labels on this showcase product are not saved.</p>}
       </aside>
     </div>
   );

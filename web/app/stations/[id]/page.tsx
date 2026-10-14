@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Decision, type Inspection } from "@/lib/api";
+import { useInspect } from "@/lib/useInspect";
 import { DecisionTag } from "@/components/DecisionTag";
 import { InspectionViewer } from "@/components/InspectionViewer";
-import { ComputeBadge } from "@/components/ComputeBadge";
+import { InspectionResult } from "@/components/InspectionResult";
 import { Camera } from "@/components/Camera";
 
 type Sample = { src: string; truth: "good" | "defective"; source: string };
@@ -13,14 +14,15 @@ type Sample = { src: string; truth: "good" | "defective"; source: string };
 const FILTERS: (Decision | "all")[] = ["all", "reject", "review", "pass"];
 
 function q_name(id: string) {
-  return id.startsWith("visa-") ? `what a good ${id.slice(5).replace(/\d+$/, "")} looks like` : "one product";
+  return id.startsWith("visa-") ? `what a good ${id.slice(5).replace(/\d+$/, "")} looks like` : "what this product looks like";
 }
 
 export default function Inspect() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const list = useQuery({ queryKey: ["inspections", id], queryFn: () => api.inspections(id) });
-  const [current, setCurrent] = useState<Inspection | null>(null);
+  const { result, setResult, inspect: run, pending } = useInspect(id);
+  const [picked, setPicked] = useState<Inspection | null>(null);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]>("all");
   const [camera, setCamera] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -31,27 +33,13 @@ export default function Inspect() {
     queryKey: ["samples"],
     queryFn: async () => ((await (await fetch("/samples/samples.json")).json()) as Record<string, Sample[]>),
   });
-  const inspect = useMutation({
-    mutationFn: (f: File) => api.inspect(id, f),
-    onSuccess: (r) => {
-      setCurrent(r);
-      qc.invalidateQueries({ queryKey: ["inspections", id] });
-      // Defect names arrive a few seconds after the decision; poll for them.
-      if (r.regions.length) {
-        [2500, 6000, 12000].forEach((ms) =>
-          setTimeout(async () => {
-            const rows = await api.inspections(id);
-            const hit = rows.find((x) => x.id === r.id);
-            if (hit) setCurrent((c) => (c && c.id === r.id ? { ...c, regions: hit.regions } : c));
-          }, ms),
-        );
-      }
-    },
-  });
+  const inspect = { isPending: pending };
+  const current = picked ?? result;
 
   function send(f: File, truth: string | null = null) {
     setSampleTruth(truth);
-    inspect.mutate(f);
+    setPicked(null);
+    run(f);
   }
 
   async function sendSample(sm: Sample) {
@@ -65,11 +53,11 @@ export default function Inspect() {
     const es = new EventSource("/api/gp/events");
     es.addEventListener("named", (e) => {
       const d = JSON.parse((e as MessageEvent).data);
-      setCurrent((c) => (c && c.id === d.inspection ? { ...c, regions: d.regions } : c));
+      setResult((c) => (c && c.id === d.inspection ? { ...c, regions: d.regions } : c));
       qc.invalidateQueries({ queryKey: ["inspections", id] });
     });
     return () => es.close();
-  }, [id, qc]);
+  }, [id, qc, setResult]);
 
   const shown = useMemo(
     () => (list.data ?? []).filter((i) => filter === "all" || i.decision === filter),
@@ -106,15 +94,15 @@ export default function Inspect() {
                 {inspect.isPending ? "Inspecting on the AMD GPU…" : "Drop a photo of a part, or choose one"}
               </span>
               <span className="mt-1 text-sm text-ink-dim">
-                This station knows {q_name(id)}. Photos of other objects will be rejected as unusual.
-                Uploaded photos are stored on the inspection server and appear in this station&apos;s recent parts.
+                This product knows {q_name(id)}. Photos of other objects will be rejected as unusual.
+                Uploaded photos are kept in this product&apos;s history.
               </span>
               <input ref={fileRef} type="file" accept="image/*" hidden disabled={inspect.isPending}
                      onChange={(e) => { const f = e.target.files?.[0]; if (f) send(f); e.target.value = ""; }} />
             </label>
             {samples.data?.[id] && (
               <div>
-                <p className="mb-1.5 text-sm text-ink-dim">No part at hand? Inspect one of these photos the station has never seen:</p>
+                <p className="mb-1.5 text-sm text-ink-dim">No part at hand? Inspect one of these photos it has never seen:</p>
                 <div className="flex gap-2">
                   {samples.data[id].map((sm) => (
                     <button key={sm.src} onClick={() => sendSample(sm)} disabled={inspect.isPending}
@@ -132,43 +120,8 @@ export default function Inspect() {
           </div>
         )}
         {camera && <Camera onCapture={(f) => send(f)} busy={inspect.isPending} />}
-        {inspect.isError && <p className="text-stop">Inspection failed: {(inspect.error as Error).message}</p>}
-
         {cur && (
-          <>
-            <DecisionTag decision={cur.decision} stampKey={cur.id} />
-            <p className="text-lg leading-snug">{cur.reason}</p>
-            <div className="flex flex-wrap items-center gap-3">
-              <ComputeBadge device={cur.device} ms={cur.latency_ms} />
-              <span className="text-sm text-ink-dim">score {cur.score.toFixed(2)}</span>
-              {cur.truth && <span className="text-sm text-ink-dim">ground truth: {cur.truth}</span>}
-              {current && current.id === cur.id && sampleTruth && (
-                <span className="text-sm text-ink-dim">This sample photo is known to be {sampleTruth}.</span>
-              )}
-            </div>
-            {cur.regions.length > 0 && (
-              <ol className="flex flex-col gap-3">
-                {cur.regions.map((r, i) => (
-                  <li key={i} className={`border-l-4 bg-housing px-4 py-3 ${r.verdict === "out_of_tolerance" ? "border-stop" : "border-hold"}`}>
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <span className="font-display text-xl font-semibold capitalize">
-                        {i + 1}. {r.name?.label ?? "naming…"}
-                      </span>
-                      <span className="text-sm text-ink-dim">
-                        {r.length_mm != null ? `${r.length_mm.toFixed(1)} mm long` : `${Math.round(r.length_px)} px long`}
-                        {r.zone ? `, ${r.zone}` : ""}
-                      </span>
-                    </div>
-                    {r.name?.description && <p className="mt-1 text-[15px]">{r.name.description}</p>}
-                    <p className="mt-1 text-sm text-ink-dim">
-                      {r.reason}
-                      {r.name?.source && r.name.source !== "template" && ` Named by ${r.name.model ?? r.name.source}.`}
-                    </p>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </>
+          <InspectionResult r={cur} note={current && current.id === cur.id && sampleTruth ? `This sample photo is known to be ${sampleTruth}.` : null} />
         )}
       </section>
 
@@ -184,7 +137,7 @@ export default function Inspect() {
         </div>
         <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-8">
           {shown.map((i) => (
-            <button key={i.id} onClick={() => setCurrent(i)}
+            <button key={i.id} onClick={() => { setPicked(i); setSampleTruth(null); }}
                     className={`group relative aspect-square overflow-hidden rounded-sm border-2 ${cur?.id === i.id ? "border-steel" : "border-transparent"}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={i.overlay_url} alt={`Part ${i.id}, ${i.decision}`} className="h-full w-full object-cover" loading="lazy" />

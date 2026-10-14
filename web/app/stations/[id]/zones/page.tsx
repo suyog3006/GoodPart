@@ -110,7 +110,7 @@ export default function Zones() {
             {save.isPending ? "Saving…" : "Save zones"}
           </button>
         ) : (
-          <p className="hatch p-2 text-sm text-hold">{api.demo ? "Demo mode: nothing is saved." : "Showcase station: zones are not saved."}</p>
+          <p className="hatch p-2 text-sm text-hold">{api.demo ? "Demo mode: nothing is saved." : "Showcase product: zones are not saved."}</p>
         )}
         {save.isSuccess && <p className="text-pass">Zones saved. New inspections use them.</p>}
         {save.isError && <p className="text-stop">Could not save zones: {(save.error as Error).message}</p>}

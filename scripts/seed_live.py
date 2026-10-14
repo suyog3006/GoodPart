@@ -27,6 +27,7 @@ from goodpart.eval.run import make_backbones  # noqa: E402
 from goodpart.station import Station  # noqa: E402
 from goodpart.stress import pod  # noqa: E402
 
+DISPLAY = {"candle": "Candle (VisA sample)", "pcb1": "PCB (VisA sample)"}
 DEFAULT_CFG = {"dino": "facebook/dinov2-base", "dino_size": 672, "wrn_size": 320}
 
 
@@ -58,7 +59,7 @@ def main():
                 "source": "VisA (CC BY 4.0), evaluated station"}
         con.execute("DELETE FROM inspection WHERE station=?", (sid,))
         con.execute("INSERT OR REPLACE INTO station (id, name, created, status, mm_per_px, zones, meta) "
-                    "VALUES (?,?,?,?,?,?,?)", (sid, f"VisA {cat}", time.time(), "ready", None, "[]",
+                    "VALUES (?,?,?,?,?,?,?)", (sid, DISPLAY.get(cat, f"{cat} (VisA sample)"), time.time(), "ready", None, "[]",
                                               json.dumps(meta, default=float)))
         # Reference image for the zone editor.
         ref_dir = config.STORE_DIR / "images" / sid / "good"

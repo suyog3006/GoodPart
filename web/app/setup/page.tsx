@@ -2,6 +2,7 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import { api, type SavedPhoto } from "@/lib/api";
 
 type Step = "name" | "photos" | "build" | "ready";
@@ -9,7 +10,7 @@ type Step = "name" | "photos" | "build" | "ready";
 const STEPS: [Step, string][] = [
   ["name", "Name the product"],
   ["photos", "Add good photos"],
-  ["build", "Build and stress-test"],
+  ["build", "Learn what good looks like"],
   ["ready", "Ready to inspect"],
 ];
 
@@ -32,6 +33,8 @@ function Setup() {
   const [error, setError] = useState<string | null>(null);
   const [log, setLog] = useState<string[]>([]);
   const [drag, setDrag] = useState(false);
+  const existing = useQuery({ queryKey: ["stations"], queryFn: api.stations, enabled: !resumeId });
+  const duplicate = existing.data?.find((p) => p.name.trim().toLowerCase() === name.trim().toLowerCase() && name.trim());
 
   // Resume: load the station and the photos already saved for it.
   useEffect(() => {
@@ -44,7 +47,7 @@ function Setup() {
         setWasReady(st.status === "ready");
         if (st.status === "building") setStep("build");
       } catch (e) {
-        setError(`Could not load this station: ${(e as Error).message}`);
+        setError(`Could not load this product: ${(e as Error).message}`);
       }
     })();
   }, [resumeId]);
@@ -74,8 +77,8 @@ function Setup() {
   if (api.demo)
     return (
       <p className="max-w-[60ch] text-ink-dim">
-        Setting up a station needs the live GPU service, which is switched off right now. You can explore the recorded
-        stations on the <Link href="/" className="text-steel underline">Stations</Link> page.
+        Adding a product needs the live GPU service, which is switched off right now. You can explore the recorded
+        products on the <Link href="/products" className="text-steel underline">Products</Link> page.
       </p>
     );
 
@@ -136,7 +139,7 @@ function Setup() {
 
   return (
     <div className="max-w-[900px]">
-      <h1 className="font-display text-4xl font-bold">{resumeId && name ? name : "Set up a station"}</h1>
+      <h1 className="font-display text-4xl font-bold">{resumeId && name ? name : "Add a product"}</h1>
       <ol className="mb-8 mt-4 flex flex-wrap gap-x-6 gap-y-2 text-[15px]">
         {STEPS.map(([k, l], i) => (
           <li key={k} className={i === idx ? "font-semibold text-ink" : i < idx ? "text-pass" : "text-ink-dim"}>
@@ -152,12 +155,25 @@ function Setup() {
             <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="e.g. Housing cover, black ABS"
                    className="mt-1 w-full rounded-sm border border-rule bg-housing px-3 py-2.5 text-lg" />
           </label>
-          <button disabled={busy || !name.trim()} className="self-start rounded-sm bg-steel px-5 py-3 font-semibold text-tag-ink disabled:opacity-60">
-            Create station
-          </button>
+          {duplicate ? (
+            <div className="border-l-4 border-hold bg-housing px-4 py-3">
+              <p>You already have a product called <b>{duplicate.name}</b>.</p>
+              <div className="mt-2 flex flex-wrap gap-3">
+                <Link href={duplicate.status === "ready" ? `/?product=${duplicate.id}` : `/setup?station=${duplicate.id}`}
+                      className="rounded-sm bg-steel px-4 py-2 font-semibold text-tag-ink">
+                  {duplicate.status === "ready" ? `Inspect a ${duplicate.name}` : `Continue adding photos of ${duplicate.name}`}
+                </Link>
+                <button type="submit" disabled={busy} className="rounded-sm border border-rule px-4 py-2">Create a second one anyway</button>
+              </div>
+            </div>
+          ) : (
+            <button disabled={busy || !name.trim()} className="self-start rounded-sm bg-steel px-5 py-3 font-semibold text-tag-ink disabled:opacity-60">
+              Save product
+            </button>
+          )}
           <p className="text-sm text-ink-dim">
-            Stations are saved with their photos and trained memory. To add photos to an existing product, open it from
-            the <Link href="/" className="text-steel underline">Stations</Link> page instead.
+            You do this once per product. Its photos and what it learned are saved; afterwards you just pick it on the{" "}
+            <Link href="/" className="text-steel underline">Inspect</Link> page and upload one photo.
           </p>
         </form>
       )}
@@ -209,18 +225,18 @@ function Setup() {
           )}
           <button disabled={busy || usable < 8} onClick={build}
                   className="self-start rounded-sm bg-steel px-5 py-3 font-semibold text-tag-ink disabled:opacity-60">
-            {wasReady ? `Rebuild station from ${usable} photos` : `Build station from ${usable} photos`}
+            {wasReady ? `Retrain on ${usable} photos` : `Train on ${usable} photos`}
           </button>
           {usable < 8 && <p className="text-sm text-ink-dim">At least 8 usable photos are needed. With 30, false rejects are bounded near 7%; with 60, near 3.6%; with 100, near 2%.</p>}
           {wasReady && sid && (
-            <Link href={`/stations/${sid}`} className="text-[15px] text-steel underline">Keep the current station and start inspecting</Link>
+            <Link href={`/?product=${sid}`} className="text-[15px] text-steel underline">Keep what it learned and inspect a photo</Link>
           )}
         </div>
       )}
 
       {step === "build" && (
         <div>
-          <p className="text-lg">Building on the GPU: extracting features, filling both memory banks, then stress-testing with synthetic defects. This takes about a minute.</p>
+          <p className="text-lg">Learning on the AMD GPU: reading every good photo, saving what good looks like, then stress-testing itself with synthetic defects. This takes about a minute.</p>
           <ul className="mt-4 flex flex-col gap-1 font-mono text-sm text-ink-dim">
             {log.map((l, i) => <li key={i}>{l}</li>)}
           </ul>
@@ -229,12 +245,12 @@ function Setup() {
 
       {step === "ready" && sid && (
         <div className="flex flex-col gap-3">
-          <p className="font-display text-3xl font-semibold text-pass">Station ready and saved.</p>
-          <p className="text-ink-dim">It stays on the Stations page; you will not need to upload these photos again.</p>
+          <p className="font-display text-3xl font-semibold text-pass">{name || "Product"} is saved and ready.</p>
+          <p className="text-ink-dim">From now on, choose it on the Inspect page and upload one photo. You will not need these good photos again.</p>
           <div className="flex flex-wrap gap-3">
             <Link href={`/stations/${sid}/zones`} className="rounded-sm border border-rule px-4 py-2.5">Draw zones</Link>
             <Link href={`/stations/${sid}/calibrate`} className="rounded-sm border border-rule px-4 py-2.5">Check calibration</Link>
-            <Link href={`/stations/${sid}`} className="rounded-sm bg-steel px-4 py-2.5 font-semibold text-tag-ink">Start inspecting</Link>
+            <Link href={`/?product=${sid}`} className="rounded-sm bg-steel px-4 py-2.5 font-semibold text-tag-ink">Inspect a photo now</Link>
           </div>
         </div>
       )}

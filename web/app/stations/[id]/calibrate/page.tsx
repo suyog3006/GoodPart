@@ -36,7 +36,7 @@ export default function Calibrate() {
   });
 
   if (q.isLoading) return <p className="text-ink-dim">Loading calibration…</p>;
-  if (!st || !preview) return <p className="text-ink-dim">This station has not been built yet.</p>;
+  if (!st || !preview) return <p className="text-ink-dim">This product has not been trained yet.</p>;
 
   return (
     <div className="grid gap-10 lg:grid-cols-[360px_minmax(0,1fr)]">
@@ -48,7 +48,7 @@ export default function Calibrate() {
                    onChange={(e) => setAlpha(+e.target.value)} className="mt-2 w-full accent-[var(--steel)]" />
           </label>
           <p className="mt-1 text-sm text-ink-dim">
-            Guaranteeing {pct(a)} needs at least {preview.needed} calibration parts; this station has {preview.n}.
+            Guaranteeing {pct(a)} needs at least {preview.needed} calibration parts; this product has {preview.n}.
           </p>
         </div>
         <div>
@@ -82,9 +82,9 @@ export default function Calibrate() {
             {apply.isPending ? "Applying…" : "Apply thresholds"}
           </button>
         ) : (
-          <p className="hatch p-2 text-sm text-hold">{api.demo ? "Demo mode: nothing is saved." : "Showcase station: thresholds preview only."}</p>
+          <p className="hatch p-2 text-sm text-hold">{api.demo ? "Demo mode: nothing is saved." : "Showcase product: thresholds preview only."}</p>
         )}
-        {apply.isSuccess && <p className="text-pass">Thresholds applied to this station.</p>}
+        {apply.isSuccess && <p className="text-pass">Thresholds applied to this product.</p>}
       </div>
 
       <div className="min-w-0">

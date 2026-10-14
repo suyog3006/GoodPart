@@ -17,7 +17,7 @@ export default function Stress() {
   const [kind, setKind] = useState<"all" | "hit" | "miss">("all");
   const st = q.data?.station;
   if (q.isLoading) return <p className="text-ink-dim">Loading the stress test…</p>;
-  if (!st) return <p className="text-ink-dim">Build the station first; the stress test runs as part of the build.</p>;
+  if (!st) return <p className="text-ink-dim">Train this product first; the stress test runs as part of training.</p>;
   const extra = q.data as unknown as Extra;
   const mm = st.mm_per_px;
   const unit = mm ? "mm" : "px";
@@ -30,7 +30,7 @@ export default function Stress() {
       <section className="grid gap-8 lg:grid-cols-[320px_minmax(0,1fr)]">
         <div className="flex flex-col gap-4">
           <p className="max-w-[60ch] text-[15px] text-ink-dim">
-            Before seeing any real defect, the station painted {st.scores.synthetic.length} synthetic defects of known size and
+            Before seeing any real defect, it painted {st.scores.synthetic.length} synthetic defects of known size and
             contrast onto held-out good parts, and checked which ones it would send to review or reject.
           </p>
           <div className="border-l-4 border-steel bg-housing px-5 py-4">

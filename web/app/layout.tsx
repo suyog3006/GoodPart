@@ -28,8 +28,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 Good<span className="text-pass">Part</span>
               </Link>
               <nav className="flex flex-wrap gap-5 text-[15px] text-ink-dim">
-                <Link className="hover:text-ink" href="/">Stations</Link>
-                <Link className="hover:text-ink" href="/setup">New station</Link>
+                <Link className="hover:text-ink" href="/">Inspect</Link>
+                <Link className="hover:text-ink" href="/products">Products</Link>
+                <Link className="hover:text-ink" href="/setup">Add product</Link>
                 <Link className="hover:text-ink" href="/evaluation">Evaluation</Link>
               </nav>
               <div className="ml-auto">

@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { api, readOnly } from "@/lib/api";
 
 const TABS = [
-  ["", "Inspect"],
+  ["", "History"],
   ["/review", "Review queue"],
   ["/calibrate", "Calibration"],
   ["/stress", "Stress test"],
@@ -19,10 +19,15 @@ export default function StationLayout({ children }: { children: React.ReactNode 
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-baseline gap-x-6 gap-y-1">
-        <h1 className="font-display text-4xl font-bold">{s.data?.name ?? "Station"}</h1>
+        <h1 className="font-display text-4xl font-bold">{s.data?.name ?? "Product"}</h1>
         {s.data?.station && <p className="text-ink-dim">{s.data.station.guarantee}</p>}
+        {s.data?.status === "ready" && (
+          <Link href={`/?product=${id}`} className="ml-auto rounded-sm bg-steel px-4 py-2 font-semibold text-tag-ink">
+            Inspect a photo
+          </Link>
+        )}
       </div>
-      <nav className="mb-6 flex flex-wrap gap-1 border-b border-rule" aria-label="Station sections">
+      <nav className="mb-6 flex flex-wrap gap-1 border-b border-rule" aria-label="Product sections">
         {!readOnly(id) && (
           <Link href={`/setup?station=${id}`} className="-mb-px order-last border-b-[3px] border-transparent px-4 py-2.5 text-[15px] text-ink-dim hover:text-ink">
             Good photos
