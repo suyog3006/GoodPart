@@ -101,7 +101,11 @@ def export_station(cat: str, res_dir: Path, out: Path, n: int, bb, cfg) -> dict:
     counts = pd.Series([i["decision"] for i in items]).value_counts().to_dict()
     row = summ["row"]
     meta = {"n_build": k, "calibration": st.calibration.to_dict(), "a90_95_px": f.get("a90_95"),
-            "selection": st.selection, "device": config.device_label(), "drift": "ok"}
+            "selection": st.selection, "device": config.device_label(),
+            # Drift status: do the test split's good parts still look like the calibration parts?
+            # (VisA's test split is half defects; a real line's are rare, so only good parts are used.)
+            "drift": monitor.test(*[np.asarray(v)[np.asarray(v) <= st.calibration.t_high] for v in
+                                    (summ["scores"]["test_good"], summ["scores"]["calibration"])])["status"]}
     detail = {"id": sid, "name": f"VisA {cat}", "status": "ready", "mm_per_px": None, "zones": [], "counts": counts,
               "meta": meta,
               "station": {"active": list(st.active), "selection": st.selection, "calibration": st.calibration.to_dict(),

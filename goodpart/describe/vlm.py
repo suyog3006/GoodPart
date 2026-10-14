@@ -21,6 +21,8 @@ NAME_PROMPT = (
     "You are inspecting a manufactured part. Image 1 is a close-up crop of a region flagged as unusual; "
     "image 2 is the same crop with an anomaly heatmap (red = most unusual). "
     f"Name the defect with exactly one label from {LABELS}. "
+    "Describe the physical defect on the part itself (shape, colour of the material, location); "
+    "do not mention the heatmap or its colours. "
     'Reply with JSON only: {"label": "<label>", "description": "<one short sentence>"}'
 )
 

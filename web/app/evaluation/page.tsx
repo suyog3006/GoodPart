@@ -35,6 +35,7 @@ export default function Evaluation() {
   if (q.isError || !q.data) return <p className="text-stop">Evaluation results are not bundled with this build yet.</p>;
   const d = q.data;
   const mean = (key: string) => rows.reduce((s, r) => s + (+r[key] || 0), 0) / Math.max(1, rows.length);
+  const sum = (key: string) => rows.reduce((s, r) => s + (+r[key] || 0), 0);
 
   const methods = ["Golden-template difference", "Zero-shot VLM", "PatchCore, default threshold", "GoodPart, single threshold", "GoodPart (pass / review / reject)"];
   const baseAgg = methods.map((m) => {
@@ -74,8 +75,8 @@ export default function Evaluation() {
         {[
           ["Mean image AUROC", num(mean("auroc"))],
           ["Mean AUPRO", num(mean("aupro"))],
-          ["Mean defects passed unseen", pct(mean("miss_rate"))],
-          ["Mean false rejects", pct(mean("false_reject_rate"))],
+          ["Defects passed without review, all categories pooled", pct(sum("miss_k") / sum("n_test_bad"))],
+          ["Good parts rejected, all categories pooled", pct(sum("false_reject_k") / sum("n_test_good"))],
         ].map(([l, v]) => (
           <div key={l}>
             <div className="font-display text-5xl font-bold">{v}</div>
@@ -146,7 +147,7 @@ export default function Evaluation() {
               <LineChart data={d.fewshot} margin={{ top: 28, right: 16, bottom: 20, left: 0 }}>
                 <CartesianGrid stroke="var(--rule)" strokeOpacity={0.5} />
                 <XAxis dataKey="k" tick={axis} label={{ value: "Good photos in the memory banks", position: "insideBottom", offset: -12, fill: "var(--ink-dim)", fontSize: 13 }} />
-                <YAxis domain={["auto", 1]} tick={axis} width={46} />
+                <YAxis domain={[(lo: number) => Math.floor(lo * 20) / 20, 1]} tick={axis} width={46} tickFormatter={(v) => v.toFixed(2)} />
                 <Tooltip contentStyle={tip} formatter={(v: number) => v.toFixed(3)} />
                 <Legend verticalAlign="top" align="left" wrapperStyle={{ top: 0, fontSize: 14 }} />
                 <Line dataKey="A" name="Detector A (DINOv2)" stroke="var(--series-good)" strokeWidth={2} dot={{ r: 4 }} />

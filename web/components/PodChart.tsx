@@ -19,7 +19,7 @@ export function PodChart({ fit, unit, scale = 1, real, height = 340 }: {
       <ResponsiveContainer>
         <ComposedChart data={data} margin={{ top: 28, right: 16, bottom: 20, left: 0 }}>
           <CartesianGrid stroke="var(--rule)" strokeOpacity={0.5} />
-          <XAxis dataKey="size" type="number" scale="log" domain={["dataMin", "dataMax"]} tick={axis}
+          <XAxis dataKey="size" type="number" scale="log" domain={[data[0]?.size ?? 1, data.at(-1)?.size ?? 100]} allowDataOverflow tick={axis}
                  tickFormatter={(v) => (v < 10 ? (+v).toFixed(1) : Math.round(v).toString())} allowDuplicatedCategory={false}
                  label={{ value: `Defect size, equivalent diameter (${unit})`, position: "insideBottom", offset: -12, fill: "var(--ink-dim)", fontSize: 13 }} />
           <YAxis domain={[0, 1]} tick={axis} tickFormatter={(v) => `${Math.round(v * 100)}%`} width={46} />
