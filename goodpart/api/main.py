@@ -107,7 +107,8 @@ def _warm():
     backbones()
     for sid in READONLY:
         try:
-            get_station(sid)
+            # One dummy inspection compiles the GPU kernels (~7 s on the first call, ~80 ms after).
+            get_station(sid).run([np.zeros((768, 768, 3), np.uint8)], maps=True)
         except HTTPException:
             pass
 
