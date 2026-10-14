@@ -1,0 +1,29 @@
+{
+ "category": "pcb1",
+ "gpu_hour_usd": 1.99,
+ "rows": [
+  {
+   "device": "AMD Instinct MI300X VF",
+   "k_build": 100,
+   "build_A_s": 2.9336843030000637,
+   "build_B_s": 5.152273501999844,
+   "img_per_s_bs1": 41.575250121606466,
+   "batch_latency_ms_bs1_p95": 21.749776450110403,
+   "img_per_s_bs32": 75.6311892185464,
+   "batch_latency_ms_bs32_p95": 423.45557569974517,
+   "stress_img_per_s": 65.61421770901538,
+   "usd_per_1000_inspections": 0.007308860054817501
+  },
+  {
+   "device": "CPU (20 threads)",
+   "k_build": 100,
+   "build_A_s": 396.14970613700007,
+   "build_B_s": 207.59679370000003,
+   "img_per_s_bs1": 0.06254069700466719,
+   "batch_latency_ms_bs1_p95": 17198.70845225,
+   "img_per_s_bs32": 0.19148338288278186,
+   "batch_latency_ms_bs32_p95": 83558.16446900007,
+   "stress_img_per_s": 0.2179319403107276
+  }
+ ]
+}

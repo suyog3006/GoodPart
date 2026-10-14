@@ -1,97 +1,89 @@
 {
- "tokenfactory": {
+ "vllm": {
   "n": 8,
   "valid_json_label": 8,
-  "wall_s": 45.43,
-  "median_latency_s": 37.034,
+  "wall_s": 2.52,
+  "median_latency_s": 1.964,
   "results": [
    {
     "file": "candle/Data/Images/Anomaly/000.JPG",
     "label": "stain",
     "valid": true,
-    "description": "A faint, irregular discolored patch is visible on the otherwise uniform surface.",
-    "model": "Qwen3.8-27B",
-    "device": "AMD Token Factory",
-    "latency_s": 35.372,
-    "tokens": 921,
-    "cost_usd": 8.69442e-05
+    "description": "The region shows a discolored area with a faint, irregular shape, indicating a stain on the surface.",
+    "model": "Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "device": "AMD MI300X (vLLM)",
+    "latency_s": 2.012,
+    "tokens": 288
    },
    {
     "file": "candle/Data/Images/Anomaly/001.JPG",
     "label": "stain",
     "valid": true,
-    "description": "An irregular, mottled discolored patch on the surface consistent with a stain.",
-    "model": "Qwen3.8-27B",
-    "device": "AMD Token Factory",
-    "latency_s": 45.075,
-    "tokens": 1081,
-    "cost_usd": 0.0001092042
+    "description": "The region shows a discolored area with a yellowish-green hue and irregular edges, indicating a stain on the surface.",
+    "model": "Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "device": "AMD MI300X (vLLM)",
+    "latency_s": 2.158,
+    "tokens": 291
    },
    {
     "file": "candle/Data/Images/Anomaly/002.JPG",
     "label": "stain",
     "valid": true,
-    "description": "A diffuse grayish-brown discoloration patch with soft, irregular edges on the surface.",
-    "model": "Qwen3.8-27B",
-    "device": "AMD Token Factory",
-    "latency_s": 39.067,
-    "tokens": 984,
-    "cost_usd": 9.55542e-05
+    "description": "The region shows a discolored area with a yellowish hue, indicating a stain on the surface.",
+    "model": "Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "device": "AMD MI300X (vLLM)",
+    "latency_s": 2.013,
+    "tokens": 287
    },
    {
     "file": "pcb1/Data/Images/Anomaly/000.JPG",
-    "label": "deformation",
+    "label": "scratch",
     "valid": true,
-    "description": "The left lead/pin is bent and kinked out of its normal straight shape compared to the adjacent pin.",
-    "model": "Qwen3.8-27B",
-    "device": "AMD Token Factory",
-    "latency_s": 18.968,
-    "tokens": 636,
-    "cost_usd": 5.13646e-05
+    "description": "The anomaly shows a linear mark on the surface, consistent with a scratch.",
+    "model": "Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "device": "AMD MI300X (vLLM)",
+    "latency_s": 1.838,
+    "tokens": 276
    },
    {
     "file": "pcb1/Data/Images/Anomaly/001.JPG",
-    "label": "deformation",
+    "label": "contamination",
     "valid": true,
-    "description": "The middle lead/pin is bent and angled out of alignment with the straight adjacent pins.",
-    "model": "Qwen3.8-27B",
-    "device": "AMD Token Factory",
-    "latency_s": 24.429,
-    "tokens": 719,
-    "cost_usd": 5.74742e-05
+    "description": "The red heatmap highlights a discolored area on the pin, indicating a contamination defect.",
+    "model": "Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "device": "AMD MI300X (vLLM)",
+    "latency_s": 1.916,
+    "tokens": 294
    },
    {
     "file": "pcb1/Data/Images/Anomaly/002.JPG",
-    "label": "deformation",
+    "label": "scratch",
     "valid": true,
-    "description": "One metal lead is bent at an angle, deviating from the straight vertical alignment of the adjacent pins.",
-    "model": "Qwen3.8-27B",
-    "device": "AMD Token Factory",
-    "latency_s": 18.923,
-    "tokens": 639,
-    "cost_usd": 4.71142e-05
+    "description": "The anomaly shows a linear mark on the surface, consistent with a scratch.",
+    "model": "Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "device": "AMD MI300X (vLLM)",
+    "latency_s": 1.837,
+    "tokens": 280
    },
    {
     "file": "cashew/Data/Images/Anomaly/000.JPG",
     "label": "stain",
     "valid": true,
-    "description": "A small reddish-brown discoloration spot is visible on the otherwise uniform yellow surface.",
-    "model": "Qwen3.8-27B",
-    "device": "AMD Token Factory",
-    "latency_s": 43.552,
-    "tokens": 1075,
-    "cost_usd": 0.000102739
+    "description": "a small brown discoloration on the surface of the part",
+    "model": "Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "device": "AMD MI300X (vLLM)",
+    "latency_s": 1.798,
+    "tokens": 310
    },
    {
     "file": "cashew/Data/Images/Anomaly/001.JPG",
     "label": "stain",
     "valid": true,
-    "description": "A dark brownish discolored patch is visible on the otherwise uniform yellow surface.",
-    "model": "Qwen3.8-27B",
-    "device": "AMD Token Factory",
-    "latency_s": 38.696,
-    "tokens": 948,
-    "cost_usd": 9.10742e-05
+    "description": "The image shows a discolored area on the surface, indicated by a red heatmap, suggesting a stain.",
+    "model": "Qwen/Qwen3-VL-30B-A3B-Instruct",
+    "device": "AMD MI300X (vLLM)",
+    "latency_s": 2.05,
+    "tokens": 284
    }
   ]
  }
