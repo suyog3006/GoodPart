@@ -46,6 +46,7 @@ class Station:
         self.selection: dict = {}
         self.calibration: st.Calibration | None = None
         self.timings: dict = {}
+        self.region_threshold = 3.0
 
     # ---- scoring ------------------------------------------------------------------------------
     def run(self, images, maps: bool = True, active=None) -> Output:
@@ -82,6 +83,7 @@ class Station:
         for k in ("A", "B"):
             self.norm[k] = st.Normaliser.fit(cal.raw[k])
             self.map_norm[k] = st.Normaliser.fit(cal.raw_maps[k][:, ::4, ::4].ravel())
+        cal_maps = {k: self.map_norm[k](cal.raw_maps[k]) for k in ("A", "B")}
         cal = Output(cal.raw, {k: self.norm[k](cal.raw[k]) for k in cal.raw}, None, None)
 
         # Synthetic stress set on held-out good images.
@@ -109,6 +111,9 @@ class Station:
         s_syn = self.combined(syn, self.active)
         self.calibration = st.calibrate(s_cal, cfg["alpha"], cfg["review_cap"], cfg.get("delta", 0.1), s_syn)
         self.cal_scores, self.synth_scores = s_cal, s_syn
+        # Region threshold: a pixel level that good calibration parts exceed only 0.1% of the time.
+        cmap = np.max(np.stack([cal_maps[k] for k in self.active]), 0)
+        self.region_threshold = float(np.quantile(cmap[:, ::2, ::2], 0.999))
         self.defects_meta = [{"kind": d.kind, "size_px": d.size_px, "contrast": d.contrast} for d in defects]
         self._defects = defects  # kept in memory for galleries; not pickled
         return self
@@ -123,6 +128,7 @@ class Station:
                  "selection": self.selection, "calibration": self.calibration, "timings": self.timings,
                  "cal_scores": self.cal_scores, "synth_scores": self.synth_scores,
                  "defects_meta": self.defects_meta, "choice": getattr(self, "choice", "A+B"),
+                 "region_threshold": self.region_threshold,
                  "banks": {k: d.bank.cpu() for k, d in self.dets.items()},
                  "pca": {"pc": self.dets["A"].pc, "mean": self.dets["A"].pc_mean, "sign": self.dets["A"].pc_sign}}
         with open(path, "wb") as f:
@@ -134,8 +140,9 @@ class Station:
             s = pickle.load(f)
         st_ = cls(backbones, s["cfg"])
         for k in ("norm", "map_norm", "active", "selection", "calibration", "timings", "cal_scores",
-                  "synth_scores", "defects_meta", "choice"):
-            setattr(st_, k, s[k])
+                  "synth_scores", "defects_meta", "choice", "region_threshold"):
+            if k in s:
+                setattr(st_, k, s[k])
         for k, b in s["banks"].items():
             st_.dets[k].bank = b.to(device)
         a = st_.dets["A"]
