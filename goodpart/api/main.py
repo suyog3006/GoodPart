@@ -103,7 +103,13 @@ def backbones():
 
 @app.on_event("startup")
 def _warm():
+    """Load models and the showcase stations' memory banks before the first visitor arrives."""
     backbones()
+    for sid in READONLY:
+        try:
+            get_station(sid)
+        except HTTPException:
+            pass
 
 
 def get_station(sid: str) -> Station:
